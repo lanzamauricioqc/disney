@@ -3,6 +3,7 @@
     <File Path="docker-compose.yml" />
     <File Path="NuGet.Config" />
   </Folder>
+  <Project Path="Persistence.PostgreSql.Dapper/Persistence.PostgreSql.Dapper.csproj" />
   <Project Path="Repositories/Repositories.csproj" Id="dd8f1ecd-4eca-4a94-b65c-71dd6a1959a7" />
   <Project Path="Worker/Worker.csproj" />
 </Solution>

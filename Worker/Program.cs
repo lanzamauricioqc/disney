@@ -1,15 +1,10 @@
+using Persistence.PostgreSql.Dapper;
+using Repositories;
 using WorkerModels;
-using Dapper;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-// Repositories and DB connection factory
-builder.Services.AddSingleton<Repositories.IDbConnectionFactory, Repositories.NpgsqlConnectionFactory>();
-builder.Services.AddScoped<Repositories.ParksRepository>();
-builder.Services.AddScoped<Repositories.LandsRepository>();
-builder.Services.AddScoped<Repositories.AttractionsRepository>();
-builder.Services.AddScoped<Repositories.QueueObservationsRepository>();
-builder.Services.AddScoped<Repositories.QueueCollectionRunsRepository>();
+builder.Services.AddPostgreSqlDapperPersistence(builder.Configuration);
 
 builder.Services.AddHostedService<Worker>();
 
@@ -22,38 +17,24 @@ builder.Services.AddHttpClient<QueueTimesClient>(client =>
         "MagicKingdomQueueWorker/1.0");
 });
 
-
-// Register Dapper type handlers for DateOnly / TimeOnly before any DB usage
-SqlMapper.AddTypeHandler(new DateOnlyHandler());
-SqlMapper.AddTypeHandler(new NullableDateOnlyHandler());
-SqlMapper.AddTypeHandler(new TimeOnlyHandler());
-SqlMapper.AddTypeHandler(new NullableTimeOnlyHandler());
-
 var host = builder.Build();
 
-// Startup diagnostics: test DB connectivity before running the host
 {
-    var loggerFactory = host.Services.GetRequiredService<ILoggerFactory>();
-    var logger = loggerFactory.CreateLogger("StartupDiagnostics");
+    var logger = host.Services.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("StartupDiagnostics");
 
     try
     {
-        using var scope = host.Services.CreateScope();
-        var factory = scope.ServiceProvider.GetRequiredService<Repositories.IDbConnectionFactory>();
-
-        using var conn = factory.CreateConnection();
         logger.LogInformation("Attempting to open database connection...");
-        conn.Open();
-
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT 1";
-        var scalar = cmd.ExecuteScalar();
-        logger.LogInformation("Database connectivity test succeeded, SELECT 1 => {Result}", scalar);
+        var healthCheck = host.Services.GetRequiredService<IDatabaseHealthCheck>();
+        await healthCheck.CheckAsync();
+        logger.LogInformation("Database connectivity test succeeded.");
     }
     catch (Exception ex)
     {
-        var logger2 = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("StartupDiagnostics");
-        logger2.LogError(ex, "Database connectivity test failed. Ensure Postgres is running and listening on the configured host/port and that the connection string is correct.");
+        logger.LogError(
+            ex,
+            "Database connectivity test failed. Ensure the configured database is available and the connection string is correct.");
     }
 }
 

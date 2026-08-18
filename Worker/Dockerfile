@@ -18,6 +18,7 @@ COPY ["NuGet.Config", "./"]
 # Copy project files first to take advantage of Docker layer caching
 COPY ["Worker/Worker.csproj", "Worker/"]
 COPY ["Repositories/Repositories.csproj", "Repositories/"]
+COPY ["Persistence.PostgreSql.Dapper/Persistence.PostgreSql.Dapper.csproj", "Persistence.PostgreSql.Dapper/"]
 
 # Credentials are available only during this RUN
 RUN --mount=type=secret,id=nuget_credentials,env=NuGetPackageSourceCredentials_NordicTech \

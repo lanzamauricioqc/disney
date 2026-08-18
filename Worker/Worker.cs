@@ -19,10 +19,10 @@ namespace WorkerModels
                 }
 
                 // load parks within a scope
-                List<Repositories.Park> parks;
+                List<Park> parks;
                 using (var scope = _scopeFactory.CreateScope())
                 {
-                    var parksRepo = scope.ServiceProvider.GetRequiredService<Repositories.ParksRepository>();
+                    var parksRepo = scope.ServiceProvider.GetRequiredService<IParksRepository>();
                     parks = parksRepo.GetAll().ToList();
                 }
 
@@ -40,10 +40,10 @@ namespace WorkerModels
                     {
                         // create a scope per park for repository operations
                         using var scope = _scopeFactory.CreateScope();
-                        var landsRepo = scope.ServiceProvider.GetRequiredService<Repositories.LandsRepository>();
-                        var attractionsRepo = scope.ServiceProvider.GetRequiredService<Repositories.AttractionsRepository>();
-                        var observationsRepo = scope.ServiceProvider.GetRequiredService<Repositories.QueueObservationsRepository>();
-                        var runsRepo = scope.ServiceProvider.GetRequiredService<Repositories.QueueCollectionRunsRepository>();
+                        var landsRepo = scope.ServiceProvider.GetRequiredService<ILandsRepository>();
+                        var attractionsRepo = scope.ServiceProvider.GetRequiredService<IAttractionsRepository>();
+                        var observationsRepo = scope.ServiceProvider.GetRequiredService<IQueueObservationsRepository>();
+                        var runsRepo = scope.ServiceProvider.GetRequiredService<IQueueCollectionRunsRepository>();
 
                         await ProcessQueueTimesAsync(park, queueTimes, landsRepo, attractionsRepo, observationsRepo, runsRepo);
                     }
@@ -53,14 +53,16 @@ namespace WorkerModels
             }
         }
         
-        private async Task ProcessQueueTimesAsync(Repositories.Park park, WaitingTimeModel queueTimes,
-            Repositories.LandsRepository landsRepository,
-            Repositories.AttractionsRepository attractionsRepository,
-            Repositories.QueueObservationsRepository observationsRepository,
-            Repositories.QueueCollectionRunsRepository runsRepository)
+        private async Task ProcessQueueTimesAsync(
+            Park park,
+            WaitingTimeModel queueTimes,
+            ILandsRepository landsRepository,
+            IAttractionsRepository attractionsRepository,
+            IQueueObservationsRepository observationsRepository,
+            IQueueCollectionRunsRepository runsRepository)
         {
             // record run start
-            var run = new Repositories.QueueCollectionRun
+            var run = new QueueCollectionRun
             {
                 Id = 0,
                 ParkId = park.Id,
@@ -108,7 +110,7 @@ namespace WorkerModels
                     var sourceRideId = ride.Id;
                     var existingAttraction = existingAttractions.FirstOrDefault(a => a.SourceRideId == sourceRideId);
 
-                    var attractionEntity = new Repositories.Attraction
+                    var attractionEntity = new Attraction
                     {
                         Id = existingAttraction?.Id ?? 0,
                         ParkId = park.Id,
@@ -135,7 +137,7 @@ namespace WorkerModels
                         observedLocal = observed.ToLocalTime();
                     }
 
-                    var observation = new Repositories.QueueObservation
+                    var observation = new QueueObservation
                     {
                         Id = 0,
                         CollectionRunId = run.Id,
