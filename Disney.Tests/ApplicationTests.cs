@@ -88,6 +88,47 @@ public sealed class ApplicationTests
         Assert.Equal([1L, 3L], service.ParkIds);
     }
 
+    [Fact]
+    public async Task AnalyticsService_UsesTrailingThreeMonthWindow()
+    {
+        var now = new DateTimeOffset(2026, 8, 18, 22, 0, 0, TimeSpan.Zero);
+        var reader = new FakeAnalyticsReader();
+        var service = new QueueAnalyticsService(reader, new FixedTimeProvider(now));
+
+        var current = await service.GetCurrentWaitTimesAsync(1, CancellationToken.None);
+        var waits = await service.GetWeekdayWaitTimePatternsAsync(
+            1,
+            20,
+            CancellationToken.None);
+        var closures = await service.GetWeekdayClosurePatternsAsync(
+            1,
+            null,
+            CancellationToken.None);
+
+        Assert.Equal(now.AddMonths(-3), current.WindowStart);
+        Assert.Equal(now, current.GeneratedAt);
+        Assert.Equal(now.AddMonths(-3), waits.WindowStart);
+        Assert.Equal(now, waits.WindowEnd);
+        Assert.Equal(now.AddMonths(-3), closures.WindowStart);
+        Assert.Equal(20, reader.AttractionId);
+    }
+
+    [Fact]
+    public async Task AnalyticsService_RejectsInvalidIdentifiers()
+    {
+        var service = new QueueAnalyticsService(
+            new FakeAnalyticsReader(),
+            new FixedTimeProvider(DateTimeOffset.UtcNow));
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.GetCurrentWaitTimesAsync(0, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.GetWeekdayWaitTimePatternsAsync(
+                1,
+                0,
+                CancellationToken.None));
+    }
+
     private static Park CreatePark(long id = 1, int sourceId = 6) =>
         new()
         {
@@ -170,5 +211,41 @@ public sealed class ApplicationTests
 
             return Task.FromResult(new CollectionResult(1, 0, 0, 0, 0, 0));
         }
+    }
+
+    private sealed class FakeAnalyticsReader : IQueueAnalyticsReader
+    {
+        public long? AttractionId { get; private set; }
+
+        public Task<IReadOnlyList<CurrentWaitTime>> GetCurrentWaitTimesAsync(
+            long parkId,
+            DateTimeOffset from,
+            DateTimeOffset to,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<CurrentWaitTime>>([]);
+
+        public Task<IReadOnlyList<WeekdayWaitTimePattern>> GetWeekdayWaitTimePatternsAsync(
+            long parkId,
+            long? attractionId,
+            DateTimeOffset from,
+            DateTimeOffset to,
+            CancellationToken cancellationToken)
+        {
+            AttractionId = attractionId;
+            return Task.FromResult<IReadOnlyList<WeekdayWaitTimePattern>>([]);
+        }
+
+        public Task<IReadOnlyList<WeekdayClosurePattern>> GetWeekdayClosurePatternsAsync(
+            long parkId,
+            long? attractionId,
+            DateTimeOffset from,
+            DateTimeOffset to,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<WeekdayClosurePattern>>([]);
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 }

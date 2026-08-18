@@ -7,11 +7,25 @@ The solution collects attraction queue times and stores an append-only history i
 - `Disney.Domain`: park, land, attraction, and observation entities.
 - `Disney.Application`: collection use cases, persistence/provider abstractions, and historical query contracts.
 - `Disney.Infrastructure`: PostgreSQL/Dapper persistence, Queue-Times HTTP integration, migrations, and historical queries.
+- `Disney.Api`: versioned dashboard endpoints, OpenAPI, health checks, caching, and rate limiting.
 - `Worker`: scheduled process and dependency-injection composition.
 - `Disney.Tests`: unit and migration-shape tests.
 
-The API is intentionally not part of the solution yet. A future API should depend on
-`Disney.Application` and use `IQueueHistoryReader` rather than querying PostgreSQL directly.
+The API depends on `Disney.Application` contracts rather than querying PostgreSQL directly.
+
+## API
+
+All analytics use the trailing three months:
+
+```text
+GET /api/v1/parks/{parkId}/wait-times/current
+GET /api/v1/parks/{parkId}/analytics/wait-times/weekday-hourly
+GET /api/v1/parks/{parkId}/analytics/closures/weekday-hourly
+```
+
+The analytics endpoints accept an optional `attractionId` query parameter. OpenAPI is
+available at `/openapi/v1.json`, with liveness and readiness at `/health/live` and
+`/health/ready`. Swagger UI is available at `/swagger`.
 
 ## Database migrations
 

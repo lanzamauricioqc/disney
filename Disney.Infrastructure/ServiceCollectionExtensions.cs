@@ -16,7 +16,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDatabaseHealthCheck, PostgreSqlDatabaseHealthCheck>();
         services.AddScoped<IParkReader, PostgreSqlParkReader>();
         services.AddScoped<IQueueCollectionStore, PostgreSqlQueueCollectionStore>();
-        services.AddScoped<IQueueHistoryReader, PostgreSqlQueueHistoryReader>();
+        services.AddScoped<IQueueAnalyticsReader, PostgreSqlQueueAnalyticsReader>();
         services.AddSingleton<QueueObservationFactory>();
 
         services.AddHttpClient<IQueueTimesProvider, QueueTimesClient>(client =>

@@ -99,6 +99,25 @@ public sealed class InfrastructureTests
             sql);
     }
 
+    [Fact]
+    public void AnalyticsReader_UsesWeekdayHourlyAggregates()
+    {
+        var path = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Disney.Infrastructure",
+            "PostgreSqlQueueAnalyticsReader.cs");
+        var source = File.ReadAllText(Path.GetFullPath(path));
+
+        Assert.Contains("percentile_cont(0.5)", source);
+        Assert.Contains("observed_day_of_week", source);
+        Assert.Contains("observed_local_hour", source);
+        Assert.Contains("ClosedPercentage", source);
+    }
+
     private sealed class StubHandler(HttpStatusCode statusCode, string content)
         : HttpMessageHandler
     {
