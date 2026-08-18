@@ -45,6 +45,9 @@ internal sealed class QueueTimesCollector(
             .ToDictionary(land => land.SourceLandId);
         var attractionsBySourceId = attractionsRepository.GetByParkId(park.Id)
             .ToDictionary(attraction => attraction.SourceRideId);
+        var returnedLandIds = queueTimes.Lands
+            .Select(land => land.Id)
+            .ToHashSet();
         var processedRideIds = new HashSet<int>();
 
         foreach (var landModel in queueTimes.Lands)
@@ -73,6 +76,21 @@ internal sealed class QueueTimesCollector(
         foreach (var ride in queueTimes.Rides.Where(ride => processedRideIds.Add(ride.Id)))
         {
             SaveRide(collectionRunId, park, null, ride, collectedAt, attractionsBySourceId);
+        }
+
+        foreach (var land in landsBySourceId.Values.Where(
+                     land => land.IsActive && !returnedLandIds.Contains(land.SourceLandId)))
+        {
+            land.IsActive = false;
+            landsRepository.Upsert(land);
+        }
+
+        foreach (var attraction in attractionsBySourceId.Values.Where(
+                     attraction => attraction.IsActive &&
+                                   !processedRideIds.Contains(attraction.SourceRideId)))
+        {
+            attraction.IsActive = false;
+            attractionsRepository.Upsert(attraction);
         }
     }
 

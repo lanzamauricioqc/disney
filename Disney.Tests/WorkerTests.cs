@@ -179,6 +179,25 @@ public sealed class WorkerTests
             ParkId = park.Id,
             SourceLandId = 10,
             Name = "Existing Tomorrowland",
+            IsActive = false,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        lands.Items.Add(new Repositories.Land
+        {
+            Id = 7,
+            ParkId = park.Id,
+            SourceLandId = 99,
+            Name = "Removed Land",
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        lands.Items.Add(new Repositories.Land
+        {
+            Id = 9,
+            ParkId = park.Id,
+            SourceLandId = 98,
+            Name = "Already Inactive Land",
+            IsActive = false,
             CreatedAt = DateTimeOffset.UtcNow
         });
         attractions.Items.Add(new Attraction
@@ -187,6 +206,25 @@ public sealed class WorkerTests
             ParkId = park.Id,
             SourceRideId = 20,
             Name = "Existing Space Mountain",
+            IsActive = false,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        attractions.Items.Add(new Attraction
+        {
+            Id = 8,
+            ParkId = park.Id,
+            SourceRideId = 99,
+            Name = "Removed Ride",
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        attractions.Items.Add(new Attraction
+        {
+            Id = 10,
+            ParkId = park.Id,
+            SourceRideId = 98,
+            Name = "Already Inactive Ride",
+            IsActive = false,
             CreatedAt = DateTimeOffset.UtcNow
         });
         var observations = new FakeObservationsRepository();
@@ -202,10 +240,16 @@ public sealed class WorkerTests
 
         await collector.CollectAsync(park, CancellationToken.None);
 
-        Assert.Equal(2, lands.Items.Count);
-        Assert.Equal(2, attractions.Items.Count);
+        Assert.Equal(4, lands.Items.Count);
+        Assert.Equal(4, attractions.Items.Count);
         Assert.Equal(2, observations.Items.Count);
         Assert.Contains(observations.Items, observation => observation.WaitMinutes is null);
+        Assert.True(lands.Items.Single(land => land.SourceLandId == 10).IsActive);
+        Assert.False(lands.Items.Single(land => land.SourceLandId == 99).IsActive);
+        Assert.False(lands.Items.Single(land => land.SourceLandId == 98).IsActive);
+        Assert.True(attractions.Items.Single(attraction => attraction.SourceRideId == 20).IsActive);
+        Assert.False(attractions.Items.Single(attraction => attraction.SourceRideId == 99).IsActive);
+        Assert.False(attractions.Items.Single(attraction => attraction.SourceRideId == 98).IsActive);
         Assert.True(Assert.Single(runs.Completions).Success);
         Assert.Null(Assert.Single(runs.Completions).ErrorMessage);
     }
@@ -365,6 +409,10 @@ public sealed class WorkerTests
                 entity.CreatedAt = DateTimeOffset.UtcNow;
                 Items.Add(entity);
             }
+            else
+            {
+                Items[Items.FindIndex(item => item.Id == entity.Id)] = entity;
+            }
 
             entity.UpdatedAt = DateTimeOffset.UtcNow;
             return entity;
@@ -385,6 +433,10 @@ public sealed class WorkerTests
                 entity.Id = Items.Count + 1;
                 entity.CreatedAt = DateTimeOffset.UtcNow;
                 Items.Add(entity);
+            }
+            else
+            {
+                Items[Items.FindIndex(item => item.Id == entity.Id)] = entity;
             }
 
             entity.UpdatedAt = DateTimeOffset.UtcNow;
