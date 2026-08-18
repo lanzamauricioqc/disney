@@ -8,7 +8,7 @@ builder.Services.AddPostgreSqlDapperPersistence(builder.Configuration);
 
 builder.Services.AddHostedService<Worker>();
 
-builder.Services.AddHttpClient<QueueTimesClient>(client =>
+builder.Services.AddHttpClient<IQueueTimesProvider, QueueTimesClient>(client =>
 {
     client.BaseAddress = new Uri("https://queue-times.com");
     client.Timeout = TimeSpan.FromSeconds(30);

@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace WorkerModels
 {
-    public class QueueTimesClient
+    public class QueueTimesClient : IQueueTimesProvider
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<QueueTimesClient> _logger;
@@ -38,26 +38,5 @@ namespace WorkerModels
             }
         }
 
-        public async Task<WaitingTimeModel?> GetMagicKingdomQueueTimesAsync(
-            CancellationToken cancellationToken)
-        {
-            try
-            {
-                var response = await _httpClient.GetAsync(
-                    "/parks/6/queue_times.json",
-                    cancellationToken);
-
-                response.EnsureSuccessStatusCode();
-
-                return await response.Content.ReadFromJsonAsync<WaitingTimeModel>(
-                    JsonOptions,
-                    cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro ao buscar tempos de fila do Magic Kingdom.");
-                return null;
-            }
-        }
     }
 }

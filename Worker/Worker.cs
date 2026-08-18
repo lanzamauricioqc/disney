@@ -4,7 +4,7 @@ using Repositories;
 namespace WorkerModels
 {
     public class Worker(
-        QueueTimesClient queueTimesClient,
+        IQueueTimesProvider queueTimesProvider,
         ILogger<Worker> logger,
         IServiceScopeFactory scopeFactory) : BackgroundService
     {
@@ -34,7 +34,7 @@ namespace WorkerModels
                         continue;
                     }
 
-                    var queueTimes = await queueTimesClient.GetQueueTimesForParkAsync(park.SourceParkId, stoppingToken);
+                    var queueTimes = await queueTimesProvider.GetQueueTimesForParkAsync(park.SourceParkId, stoppingToken);
 
                     if (queueTimes is not null)
                     {
