@@ -1,0 +1,12 @@
+C:\NordicTech\Disney\Repositories\obj\Debug\net10.0\Repositories.csproj.AssemblyReference.cache
+C:\NordicTech\Disney\Repositories\obj\Debug\net10.0\Repositories.GeneratedMSBuildEditorConfig.editorconfig
+C:\NordicTech\Disney\Repositories\obj\Debug\net10.0\Repositories.AssemblyInfoInputs.cache
+C:\NordicTech\Disney\Repositories\obj\Debug\net10.0\Repositories.AssemblyInfo.cs
+C:\NordicTech\Disney\Repositories\obj\Debug\net10.0\Repositories.csproj.CoreCompileInputs.cache
+C:\NordicTech\Disney\Repositories\bin\Debug\net10.0\Repositories.deps.json
+C:\NordicTech\Disney\Repositories\bin\Debug\net10.0\Repositories.dll
+C:\NordicTech\Disney\Repositories\bin\Debug\net10.0\Repositories.pdb
+C:\NordicTech\Disney\Repositories\obj\Debug\net10.0\Repositories.dll
+C:\NordicTech\Disney\Repositories\obj\Debug\net10.0\refint\Repositories.dll
+C:\NordicTech\Disney\Repositories\obj\Debug\net10.0\Repositories.pdb
+C:\NordicTech\Disney\Repositories\obj\Debug\net10.0\ref\Repositories.dll

@@ -1,0 +1,17 @@
+﻿using WorkerModels;
+
+var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddHostedService<Worker>();
+
+builder.Services.AddHttpClient<QueueTimesClient>(client =>
+{
+    client.BaseAddress = new Uri("https://queue-times.com");
+    client.Timeout = TimeSpan.FromSeconds(30);
+
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "MagicKingdomQueueWorker/1.0");
+});
+
+
+var host = builder.Build();
+host.Run();

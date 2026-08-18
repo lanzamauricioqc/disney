@@ -1,0 +1,50 @@
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: Worker/Dockerfile
+      secrets:
+        - nuget_credentials
+
+    container_name: queue-times-worker
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=queue_times;Username=queue_user;Password=queue_password"
+
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17
+    container_name: queue-times-postgres
+
+    environment:
+      POSTGRES_DB: queue_times
+      POSTGRES_USER: queue_user
+      POSTGRES_PASSWORD: queue_password
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - queue_times_postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U queue_user -d queue_times"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    restart: unless-stopped
+
+
+volumes:
+  queue_times_postgres_data:
+
+
+secrets:
+  nuget_credentials:
+    environment: NUGET_NORDICTECH_CREDENTIALS

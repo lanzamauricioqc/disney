@@ -1,0 +1,17 @@
+﻿{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=host.docker.internal;Port=5432;Database=queue_times;Username=queue_user;Password=queue_password"
+  },
+  "QueueTimes": {
+    "ParkSourceId": 6,
+    "ParkName": "Magic Kingdom",
+    "ParkTimezone": "America/New_York",
+    "Url": "https://queue-times.com/parks/6/queue_times.json"
+  }
+}

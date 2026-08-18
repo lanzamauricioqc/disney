@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "dgSpecHash": "1FrnvMDJX3M=",
+  "success": true,
+  "projectFilePath": "C:\\NordicTech\\Disney\\Repositories\\Repositories.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\ASUS-ROG\\.nuget\\packages\\dapper\\2.1.79\\dapper.2.1.79.nupkg.sha512",
+    "C:\\Users\\ASUS-ROG\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\10.0.11\\microsoft.extensions.configuration.abstractions.10.0.11.nupkg.sha512",
+    "C:\\Users\\ASUS-ROG\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\10.0.0\\microsoft.extensions.dependencyinjection.abstractions.10.0.0.nupkg.sha512",
+    "C:\\Users\\ASUS-ROG\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\10.0.0\\microsoft.extensions.logging.abstractions.10.0.0.nupkg.sha512",
+    "C:\\Users\\ASUS-ROG\\.nuget\\packages\\microsoft.extensions.primitives\\10.0.11\\microsoft.extensions.primitives.10.0.11.nupkg.sha512",
+    "C:\\Users\\ASUS-ROG\\.nuget\\packages\\nordictech.repositories.interfaces\\1.0.3\\nordictech.repositories.interfaces.1.0.3.nupkg.sha512",
+    "C:\\Users\\ASUS-ROG\\.nuget\\packages\\npgsql\\10.0.3\\npgsql.10.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}

@@ -1,0 +1,12 @@
+﻿using System.Collections.Generic;
+
+namespace Repositories.Interfaces
+{
+    public interface IRepository<TEntity, TKey>
+    {
+        IEnumerable<TEntity> GetAll();
+        TEntity GetById(TKey id);
+        TEntity InsertOrUpdate(TEntity entity);
+        bool DeleteById(TKey id);
+    }
+}

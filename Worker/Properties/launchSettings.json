@@ -1,0 +1,16 @@
+{
+  "profiles": {
+    "Worker": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      },
+      "dotnetRunMessages": true
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker",
+      "containerRunArguments": "--network disney_default"
+    }
+  },
+  "$schema": "https://json.schemastore.org/launchsettings.json"
+}

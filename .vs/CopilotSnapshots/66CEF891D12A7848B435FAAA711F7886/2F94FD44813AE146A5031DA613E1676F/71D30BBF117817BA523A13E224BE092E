@@ -1,0 +1,65 @@
+﻿using System.Linq;
+using Repositories;
+
+namespace WorkerModels
+{
+    public class Worker(
+        QueueTimesClient queueTimesClient,
+        ILogger<Worker> logger,
+        ParksRepository parksRepository,
+        LandsRepository landsRepository,
+        AttractionsRepository attractionsRepository,
+        QueueObservationsRepository observationsRepository,
+        QueueCollectionRunsRepository runsRepository) : BackgroundService
+    {
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                }
+
+                var parks = parksRepository.GetAll().ToList();
+
+                foreach (var park in parks)
+                {
+                    if (string.IsNullOrWhiteSpace(park.SourceParkId))
+                    {
+                        logger.LogWarning("Park {ParkId} has no source id, skipping.", park.Id);
+                        continue;
+                    }
+
+                    var queueTimes = await queueTimesClient.GetQueueTimesForParkAsync(park.SourceParkId, stoppingToken);
+
+                    if (queueTimes is not null)
+                    {
+                        await ProcessQueueTimesAsync(park, queueTimes);
+                    }
+                }
+
+                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+            }
+        }
+        
+        private void ProcessQueueTimes(WaitingTimeModel queueTimes)
+        {
+            foreach (var land in queueTimes.Lands)
+            {
+                logger.LogInformation("Land: {LandName}", land.Name);
+
+                foreach (var ride in land.Rides)
+                {
+                    logger.LogInformation(
+                        "{RideId} | {RideName} | Open: {IsOpen} | Wait: {WaitTime} min | Updated: {LastUpdated}",
+                        ride.Id,
+                        ride.Name,
+                        ride.IsOpen,
+                        ride.WaitTime,
+                        ride.LastUpdated);
+                }
+            }
+        }
+    }
+}
