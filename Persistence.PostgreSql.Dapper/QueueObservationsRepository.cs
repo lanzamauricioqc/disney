@@ -27,7 +27,7 @@ internal sealed class QueueObservationsRepository(IDbConnectionFactory connectio
                  @ObservedLocalDate, @ObservedLocalTime, @ObservedLocalHour,
                  @ObservedSlotMinutes, @ObservedDayOfWeek, @IsOpen, @WaitMinutes,
                  @SourceLastUpdated, @CreatedAt)
-            ON CONFLICT ON CONSTRAINT uq_queue_observations_attraction_date_slot
+            ON CONFLICT (attraction_id, observed_local_date, observed_slot_minutes)
             DO UPDATE SET
               collection_run_id = EXCLUDED.collection_run_id,
               collected_at = EXCLUDED.collected_at,

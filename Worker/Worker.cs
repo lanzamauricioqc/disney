@@ -1,10 +1,13 @@
+using Microsoft.Extensions.Options;
+
 namespace WorkerModels;
 
 public sealed class Worker(
     ILogger<Worker> logger,
-    IServiceScopeFactory scopeFactory) : BackgroundService
+    IServiceScopeFactory scopeFactory,
+    IOptions<QueueCollectionOptions> options) : BackgroundService
 {
-    private static readonly TimeSpan CollectionInterval = TimeSpan.FromMinutes(5);
+    private readonly TimeSpan _collectionInterval = options.Value.Interval;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -26,7 +29,7 @@ public sealed class Worker(
                 logger.LogError(ex, "Queue-time collection cycle failed.");
             }
 
-            await Task.Delay(CollectionInterval, stoppingToken);
+            await Task.Delay(_collectionInterval, stoppingToken);
         }
     }
 }

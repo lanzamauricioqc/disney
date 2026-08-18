@@ -17,4 +17,8 @@
     <ProjectReference Include="..\Repositories\Repositories.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Disney.Tests" />
+  </ItemGroup>
+
 </Project>

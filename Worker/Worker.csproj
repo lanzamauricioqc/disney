@@ -18,4 +18,8 @@
     <ProjectReference Include="..\Persistence.PostgreSql.Dapper\Persistence.PostgreSql.Dapper.csproj" />
     <ProjectReference Include="..\Repositories\Repositories.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Disney.Tests" />
+  </ItemGroup>
 </Project>

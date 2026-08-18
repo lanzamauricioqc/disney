@@ -10,6 +10,8 @@ builder.Services.AddHostedService<Worker>();
 builder.Services.AddScoped<IQueueCollectionJob, QueueCollectionJob>();
 builder.Services.AddScoped<IQueueTimesCollector, QueueTimesCollector>();
 builder.Services.AddSingleton<QueueObservationFactory>();
+builder.Services.Configure<QueueCollectionOptions>(
+    builder.Configuration.GetSection("QueueCollection"));
 
 builder.Services.AddHttpClient<IQueueTimesProvider, QueueTimesClient>(client =>
 {
