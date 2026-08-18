@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Repositories;
 
 namespace WorkerModels;
@@ -14,15 +15,56 @@ internal sealed class QueueTimesCollector(
     public async Task CollectAsync(Park park, CancellationToken cancellationToken)
     {
         var run = runsRepository.Start(park.Id, DateTimeOffset.UtcNow);
+        var stopwatch = Stopwatch.StartNew();
+        using var scope = logger.BeginScope(
+            new Dictionary<string, object>
+            {
+                ["CollectionRunId"] = run.Id,
+                ["ParkId"] = park.Id,
+                ["SourceParkId"] = park.SourceParkId
+            });
 
         try
         {
+            logger.LogInformation(
+                LogEvents.CollectionRunStarted,
+                "Collection run started for park {ParkName}.",
+                park.Name);
+
             var queueTimes = await queueTimesProvider.GetQueueTimesForParkAsync(
                 park.SourceParkId,
                 cancellationToken);
 
-            ProcessQueueTimes(run.Id, park, queueTimes);
+            logger.LogInformation(
+                LogEvents.QueueTimesReceived,
+                "Queue-times payload received with {LandCount} lands and {TopLevelRideCount} top-level rides.",
+                queueTimes.Lands.Count,
+                queueTimes.Rides.Count);
+
+            var result = ProcessQueueTimes(run.Id, park, queueTimes);
             runsRepository.Complete(run.Id, DateTimeOffset.UtcNow, success: true);
+
+            logger.LogInformation(
+                LogEvents.CollectionRunCompleted,
+                "Collection run completed in {ElapsedMs} ms. Lands processed: {LandCount}; rides observed: {RideCount}; lands deactivated: {DeactivatedLandCount}; attractions deactivated: {DeactivatedAttractionCount}.",
+                stopwatch.ElapsedMilliseconds,
+                result.LandCount,
+                result.RideCount,
+                result.DeactivatedLandCount,
+                result.DeactivatedAttractionCount);
+        }
+        catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+        {
+            runsRepository.Complete(
+                run.Id,
+                DateTimeOffset.UtcNow,
+                success: false,
+                errorMessage: ex.Message);
+            logger.LogWarning(
+                LogEvents.CollectionRunCanceled,
+                "Collection run was canceled after {ElapsedMs} ms.",
+                stopwatch.ElapsedMilliseconds);
+            throw;
         }
         catch (Exception ex)
         {
@@ -31,11 +73,16 @@ internal sealed class QueueTimesCollector(
                 DateTimeOffset.UtcNow,
                 success: false,
                 errorMessage: ex.Message);
+            logger.LogError(
+                LogEvents.CollectionRunFailed,
+                ex,
+                "Collection run failed after {ElapsedMs} ms.",
+                stopwatch.ElapsedMilliseconds);
             throw;
         }
     }
 
-    private void ProcessQueueTimes(
+    private CollectionResult ProcessQueueTimes(
         int collectionRunId,
         Park park,
         WaitingTimeModel queueTimes)
@@ -49,6 +96,8 @@ internal sealed class QueueTimesCollector(
             .Select(land => land.Id)
             .ToHashSet();
         var processedRideIds = new HashSet<int>();
+        var deactivatedLandCount = 0;
+        var deactivatedAttractionCount = 0;
 
         foreach (var landModel in queueTimes.Lands)
         {
@@ -83,6 +132,7 @@ internal sealed class QueueTimesCollector(
         {
             land.IsActive = false;
             landsRepository.Upsert(land);
+            deactivatedLandCount++;
         }
 
         foreach (var attraction in attractionsBySourceId.Values.Where(
@@ -91,7 +141,14 @@ internal sealed class QueueTimesCollector(
         {
             attraction.IsActive = false;
             attractionsRepository.Upsert(attraction);
+            deactivatedAttractionCount++;
         }
+
+        return new CollectionResult(
+            queueTimes.Lands.Count,
+            processedRideIds.Count,
+            deactivatedLandCount,
+            deactivatedAttractionCount);
     }
 
     private void SaveRide(
@@ -127,12 +184,19 @@ internal sealed class QueueTimesCollector(
 
         observationsRepository.Upsert(observation);
 
-        logger.LogInformation(
-            "{RideId} | {RideName} | Open: {IsOpen} | Wait: {WaitTime} min | Updated: {LastUpdated}",
+        logger.LogDebug(
+            LogEvents.RideObserved,
+            "Ride observation stored for source ride {SourceRideId} ({RideName}). Open: {IsOpen}; wait: {WaitMinutes}; source updated: {SourceLastUpdated}.",
             ride.Id,
             ride.Name,
             ride.IsOpen,
             ride.WaitTime,
             ride.LastUpdated);
     }
+
+    private sealed record CollectionResult(
+        int LandCount,
+        int RideCount,
+        int DeactivatedLandCount,
+        int DeactivatedAttractionCount);
 }

@@ -15,6 +15,9 @@ services:
     environment:
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=queue_times;Username=queue_user;Password=queue_password"
 
+    labels:
+      logs.collect: "true"
+
     restart: unless-stopped
 
   postgres:
@@ -38,11 +41,75 @@ services:
       timeout: 5s
       retries: 5
 
+    labels:
+      logs.collect: "true"
+
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.7.6
+    container_name: queue-times-loki
+    command: -config.file=/etc/loki/config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki.yml:/etc/loki/config.yml:ro
+      - queue_times_loki_data:/loki
+    healthcheck:
+      test: ["CMD", "/usr/bin/loki", "-version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:v1.18.1
+    container_name: queue-times-alloy
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    depends_on:
+      loki:
+        condition: service_healthy
+    ports:
+      - "12345:12345"
+    volumes:
+      - ./observability/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - queue_times_alloy_data:/var/lib/alloy/data
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-oss:13.0.2
+    container_name: queue-times-grafana
+    depends_on:
+      loki:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning/datasources/loki.yml:/etc/grafana/provisioning/datasources/loki.yml:ro
+      - queue_times_grafana_data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/health | grep -q ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
 
 volumes:
   queue_times_postgres_data:
+  queue_times_loki_data:
+  queue_times_alloy_data:
+  queue_times_grafana_data:
 
 
 secrets:

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Options;
 
 namespace WorkerModels;
@@ -11,14 +12,32 @@ public sealed class Worker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        logger.LogInformation(
+            LogEvents.WorkerStarted,
+            "Queue-time worker started with a collection interval of {CollectionIntervalMs} ms.",
+            _collectionInterval.TotalMilliseconds);
+
         while (!stoppingToken.IsCancellationRequested)
         {
+            var cycleId = Guid.NewGuid();
+            var stopwatch = Stopwatch.StartNew();
+            using var scope = logger.BeginScope(
+                new Dictionary<string, object> { ["CollectionCycleId"] = cycleId });
+
             try
             {
-                logger.LogInformation("Starting queue-time collection cycle.");
-                using var scope = scopeFactory.CreateScope();
-                var job = scope.ServiceProvider.GetRequiredService<IQueueCollectionJob>();
+                logger.LogInformation(
+                    LogEvents.CollectionCycleStarted,
+                    "Queue-time collection cycle started.");
+
+                using var serviceScope = scopeFactory.CreateScope();
+                var job = serviceScope.ServiceProvider.GetRequiredService<IQueueCollectionJob>();
                 await job.ExecuteAsync(stoppingToken);
+
+                logger.LogInformation(
+                    LogEvents.CollectionCycleCompleted,
+                    "Queue-time collection cycle completed in {ElapsedMs} ms.",
+                    stopwatch.ElapsedMilliseconds);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -26,10 +45,25 @@ public sealed class Worker(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Queue-time collection cycle failed.");
+                logger.LogError(
+                    LogEvents.CollectionCycleFailed,
+                    ex,
+                    "Queue-time collection cycle failed after {ElapsedMs} ms.",
+                    stopwatch.ElapsedMilliseconds);
             }
 
-            await Task.Delay(_collectionInterval, stoppingToken);
+            try
+            {
+                await Task.Delay(_collectionInterval, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
+
+        logger.LogInformation(
+            LogEvents.WorkerStopping,
+            "Queue-time worker is stopping.");
     }
 }

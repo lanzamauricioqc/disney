@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Repositories;
@@ -13,6 +14,7 @@ public sealed class WorkerTests
     [Fact]
     public async Task QueueTimesClient_DeserializesSuccessfulResponse()
     {
+        var logger = new TestLogger<QueueTimesClient>();
         using var httpClient = new HttpClient(new StubHttpMessageHandler(
             HttpStatusCode.OK,
             """
@@ -34,18 +36,25 @@ public sealed class WorkerTests
         {
             BaseAddress = new Uri("https://queue-times.test")
         };
-        var client = new QueueTimesClient(httpClient, NullLogger<QueueTimesClient>.Instance);
+        var client = new QueueTimesClient(httpClient, logger);
 
         var result = await client.GetQueueTimesForParkAsync(
             6,
             CancellationToken.None);
 
         Assert.Equal("Space Mountain", Assert.Single(Assert.Single(result.Lands).Rides).Name);
+        Assert.Contains(logger.Entries, entry =>
+            entry.EventId == LogEvents.QueueTimesRequestStarted &&
+            AssertProperty(entry, "SourceParkId", 6));
+        Assert.Contains(logger.Entries, entry =>
+            entry.EventId == LogEvents.QueueTimesRequestCompleted &&
+            AssertProperty(entry, "StatusCode", 200));
     }
 
     [Fact]
     public async Task QueueTimesClient_RejectsFailuresAndEmptyPayloads()
     {
+        var logger = new TestLogger<QueueTimesClient>();
         using var failedClient = new HttpClient(
             new StubHttpMessageHandler(HttpStatusCode.InternalServerError, "{}"))
         {
@@ -58,11 +67,17 @@ public sealed class WorkerTests
         };
 
         await Assert.ThrowsAsync<HttpRequestException>(
-            () => new QueueTimesClient(failedClient, NullLogger<QueueTimesClient>.Instance)
+            () => new QueueTimesClient(failedClient, logger)
                 .GetQueueTimesForParkAsync(6, CancellationToken.None));
         await Assert.ThrowsAsync<InvalidDataException>(
             () => new QueueTimesClient(emptyClient, NullLogger<QueueTimesClient>.Instance)
                 .GetQueueTimesForParkAsync(6, CancellationToken.None));
+
+        var rejection = Assert.Single(
+            logger.Entries,
+            entry => entry.EventId == LogEvents.QueueTimesRequestRejected);
+        Assert.Equal(LogLevel.Warning, rejection.Level);
+        Assert.True(AssertProperty(rejection, "StatusCode", 500));
     }
 
     [Fact]
@@ -108,6 +123,7 @@ public sealed class WorkerTests
     [Fact]
     public async Task QueueCollectionJob_SkipsInvalidParksAndContinuesAfterFailure()
     {
+        var logger = new TestLogger<QueueCollectionJob>();
         var parks = new FakeParksRepository(
             CreatePark(1, sourceParkId: 0),
             CreatePark(2),
@@ -117,16 +133,31 @@ public sealed class WorkerTests
         var job = new QueueCollectionJob(
             parks,
             collector,
-            NullLogger<QueueCollectionJob>.Instance);
+            logger);
 
         await job.ExecuteAsync(CancellationToken.None);
 
         Assert.Equal([2, 3], collector.ParkIds);
+        Assert.Contains(logger.Entries, entry =>
+            entry.EventId == LogEvents.ParkSkipped &&
+            entry.Level == LogLevel.Warning);
+        Assert.Contains(logger.Entries, entry =>
+            entry.EventId == LogEvents.ParkCollectionFailed &&
+            entry.Level == LogLevel.Error &&
+            entry.Exception is InvalidOperationException &&
+            AssertProperty(entry, "ExceptionType", nameof(InvalidOperationException)));
+        var completed = Assert.Single(
+            logger.Entries,
+            entry => entry.EventId == LogEvents.CollectionJobCompleted);
+        Assert.True(AssertProperty(completed, "SucceededCount", 1));
+        Assert.True(AssertProperty(completed, "FailedCount", 1));
+        Assert.True(AssertProperty(completed, "SkippedCount", 1));
     }
 
     [Fact]
     public async Task QueueCollectionJob_PropagatesCancellation()
     {
+        var logger = new TestLogger<QueueCollectionJob>();
         using var cancellation = new CancellationTokenSource();
         var collector = new FakeCollector(_ =>
         {
@@ -136,15 +167,19 @@ public sealed class WorkerTests
         var job = new QueueCollectionJob(
             new FakeParksRepository(CreatePark(1)),
             collector,
-            NullLogger<QueueCollectionJob>.Instance);
+            logger);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => job.ExecuteAsync(cancellation.Token));
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.EventId == LogEvents.CollectionJobCanceled);
     }
 
     [Fact]
     public async Task QueueTimesCollector_SynchronizesLandsRidesAndObservations()
     {
+        var logger = new TestLogger<QueueTimesCollector>();
         var park = CreatePark(1);
         var topLevelRide = CreateRide(30, "Main Street Vehicle");
         topLevelRide.IsOpen = false;
@@ -236,7 +271,7 @@ public sealed class WorkerTests
             observations,
             runs,
             new QueueObservationFactory(),
-            NullLogger<QueueTimesCollector>.Instance);
+            logger);
 
         await collector.CollectAsync(park, CancellationToken.None);
 
@@ -252,11 +287,22 @@ public sealed class WorkerTests
         Assert.False(attractions.Items.Single(attraction => attraction.SourceRideId == 98).IsActive);
         Assert.True(Assert.Single(runs.Completions).Success);
         Assert.Null(Assert.Single(runs.Completions).ErrorMessage);
+        Assert.Contains(logger.Entries, entry =>
+            entry.EventId == LogEvents.QueueTimesReceived &&
+            AssertProperty(entry, "LandCount", 2));
+        var completed = Assert.Single(
+            logger.Entries,
+            entry => entry.EventId == LogEvents.CollectionRunCompleted);
+        Assert.True(AssertProperty(completed, "RideCount", 2));
+        Assert.True(AssertProperty(completed, "DeactivatedLandCount", 1));
+        Assert.True(AssertProperty(completed, "DeactivatedAttractionCount", 1));
+        Assert.Equal(1, completed.Scope["CollectionRunId"]);
     }
 
     [Fact]
     public async Task QueueTimesCollector_MarksFailedRunAndRethrows()
     {
+        var logger = new TestLogger<QueueTimesCollector>();
         var runs = new FakeRunsRepository();
         var collector = new QueueTimesCollector(
             new ThrowingQueueTimesProvider(),
@@ -265,7 +311,7 @@ public sealed class WorkerTests
             new FakeObservationsRepository(),
             runs,
             new QueueObservationFactory(),
-            NullLogger<QueueTimesCollector>.Instance);
+            logger);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => collector.CollectAsync(CreatePark(1), CancellationToken.None));
@@ -273,6 +319,36 @@ public sealed class WorkerTests
         var completion = Assert.Single(runs.Completions);
         Assert.False(completion.Success);
         Assert.Equal("provider failed", completion.ErrorMessage);
+        var failed = Assert.Single(
+            logger.Entries,
+            entry => entry.EventId == LogEvents.CollectionRunFailed);
+        Assert.Equal(LogLevel.Error, failed.Level);
+        Assert.IsType<InvalidOperationException>(failed.Exception);
+    }
+
+    [Fact]
+    public async Task QueueTimesCollector_LogsCancellationAndMarksRunFailed()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var runs = new FakeRunsRepository();
+        var logger = new TestLogger<QueueTimesCollector>();
+        var collector = new QueueTimesCollector(
+            new CancelingQueueTimesProvider(cancellation.Token),
+            new FakeLandsRepository(),
+            new FakeAttractionsRepository(),
+            new FakeObservationsRepository(),
+            runs,
+            new QueueObservationFactory(),
+            logger);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => collector.CollectAsync(CreatePark(1), cancellation.Token));
+
+        Assert.False(Assert.Single(runs.Completions).Success);
+        Assert.Contains(logger.Entries, entry =>
+            entry.EventId == LogEvents.CollectionRunCanceled &&
+            entry.Level == LogLevel.Warning);
     }
 
     [Fact]
@@ -280,6 +356,7 @@ public sealed class WorkerTests
     {
         using var cancellation = new CancellationTokenSource();
         var executionCount = 0;
+        var logger = new TestLogger<WorkerModels.Worker>();
         var worker = CreateWorker(new DelegateJob(_ =>
         {
             executionCount++;
@@ -290,40 +367,63 @@ public sealed class WorkerTests
 
             cancellation.Cancel();
             return Task.FromCanceled(cancellation.Token);
-        }));
+        }), logger);
 
         await worker.StartAsync(cancellation.Token);
         await worker.ExecuteTask!;
 
         Assert.True(worker.ExecuteTask.IsCompletedSuccessfully);
         Assert.Equal(2, executionCount);
+        Assert.Contains(logger.Entries, entry =>
+            entry.EventId == LogEvents.CollectionCycleCompleted);
+        Assert.Contains(logger.Entries, entry =>
+            entry.EventId == LogEvents.WorkerStopping);
+        Assert.All(
+            logger.Entries.Where(entry => entry.EventId == LogEvents.CollectionCycleStarted),
+            entry => Assert.True(entry.Scope.ContainsKey("CollectionCycleId")));
     }
 
     [Fact]
-    public async Task Worker_LogsUnexpectedFailureUntilCancellationStopsDelay()
+    public async Task Worker_LogsUnexpectedFailureAndStopsGracefully()
     {
         using var cancellation = new CancellationTokenSource();
+        var logger = new TestLogger<WorkerModels.Worker>();
         var worker = CreateWorker(new DelegateJob(_ =>
         {
             cancellation.Cancel();
             return Task.FromException(new InvalidOperationException("cycle failed"));
-        }));
+        }), logger);
 
         await worker.StartAsync(cancellation.Token);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => worker.ExecuteTask!);
+        await worker.ExecuteTask!;
+
+        var failed = Assert.Single(
+            logger.Entries,
+            entry => entry.EventId == LogEvents.CollectionCycleFailed);
+        Assert.Equal(LogLevel.Error, failed.Level);
+        Assert.IsType<InvalidOperationException>(failed.Exception);
     }
 
-    private static WorkerModels.Worker CreateWorker(IQueueCollectionJob job)
+    private static WorkerModels.Worker CreateWorker(
+        IQueueCollectionJob job,
+        ILogger<WorkerModels.Worker>? logger = null)
     {
         var services = new ServiceCollection();
         services.AddScoped(_ => job);
         var provider = services.BuildServiceProvider();
 
         return new WorkerModels.Worker(
-            NullLogger<WorkerModels.Worker>.Instance,
+            logger ?? NullLogger<WorkerModels.Worker>.Instance,
             provider.GetRequiredService<IServiceScopeFactory>(),
             Options.Create(new QueueCollectionOptions { Interval = TimeSpan.Zero }));
     }
+
+    private static bool AssertProperty<T>(
+        LogEntry entry,
+        string name,
+        T expected) =>
+        entry.Properties.TryGetValue(name, out var value) &&
+        Equals(value, expected);
 
     private static Park CreatePark(int id, int sourceParkId = 6) =>
         new()
@@ -392,6 +492,21 @@ public sealed class WorkerTests
             CancellationToken cancellationToken) =>
             Task.FromException<WaitingTimeModel>(
                 new InvalidOperationException("provider failed"));
+    }
+
+    private sealed class CancelingQueueTimesProvider : IQueueTimesProvider
+    {
+        private readonly CancellationToken _cancellationToken;
+
+        public CancelingQueueTimesProvider(CancellationToken cancellationToken)
+        {
+            _cancellationToken = cancellationToken;
+        }
+
+        public Task<WaitingTimeModel> GetQueueTimesForParkAsync(
+            int sourceParkId,
+            CancellationToken cancellationToken) =>
+            Task.FromCanceled<WaitingTimeModel>(_cancellationToken);
     }
 
     private sealed class FakeLandsRepository : ILandsRepository
@@ -480,4 +595,59 @@ public sealed class WorkerTests
     {
         public Task ExecuteAsync(CancellationToken cancellationToken) => execute(cancellationToken);
     }
+
+    private sealed class TestLogger<T> : ILogger<T>
+    {
+        private readonly Stack<IReadOnlyDictionary<string, object?>> _scopes = new();
+
+        public List<LogEntry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            var scope = ToDictionary(state);
+            _scopes.Push(scope);
+            return new Scope(() => _scopes.Pop());
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var scope = _scopes
+                .Reverse()
+                .SelectMany(item => item)
+                .ToDictionary(item => item.Key, item => item.Value);
+            Entries.Add(new LogEntry(
+                logLevel,
+                eventId,
+                formatter(state, exception),
+                exception,
+                ToDictionary(state),
+                scope));
+        }
+
+        private static IReadOnlyDictionary<string, object?> ToDictionary<TState>(TState state) =>
+            state is IEnumerable<KeyValuePair<string, object?>> properties
+                ? properties.ToDictionary(item => item.Key, item => item.Value)
+                : new Dictionary<string, object?> { ["Scope"] = state };
+
+        private sealed class Scope(Action dispose) : IDisposable
+        {
+            public void Dispose() => dispose();
+        }
+    }
+
+    private sealed record LogEntry(
+        LogLevel Level,
+        EventId EventId,
+        string Message,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties,
+        IReadOnlyDictionary<string, object?> Scope);
 }
