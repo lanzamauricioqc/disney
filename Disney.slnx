@@ -3,8 +3,9 @@
     <File Path="docker-compose.yml" />
     <File Path="NuGet.Config" />
   </Folder>
+  <Project Path="Disney.Application/Disney.Application.csproj" />
+  <Project Path="Disney.Domain/Disney.Domain.csproj" />
+  <Project Path="Disney.Infrastructure/Disney.Infrastructure.csproj" />
   <Project Path="Disney.Tests/Disney.Tests.csproj" />
-  <Project Path="Persistence.PostgreSql.Dapper/Persistence.PostgreSql.Dapper.csproj" />
-  <Project Path="Repositories/Repositories.csproj" Id="dd8f1ecd-4eca-4a94-b65c-71dd6a1959a7" />
   <Project Path="Worker/Worker.csproj" />
 </Solution>

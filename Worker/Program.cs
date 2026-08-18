@@ -1,6 +1,6 @@
-using Persistence.PostgreSql.Dapper;
-using Repositories;
-using WorkerModels;
+using Disney.Application;
+using Disney.Infrastructure;
+using Disney.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -19,23 +19,13 @@ builder.Logging.AddJsonConsole(options =>
     options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
 });
 
-builder.Services.AddPostgreSqlDapperPersistence(builder.Configuration);
+builder.Services.AddDisneyInfrastructure(builder.Configuration);
 
-builder.Services.AddHostedService<Worker>();
+builder.Services.AddHostedService<QueueCollectionWorker>();
+builder.Services.AddScoped<IQueueCollectionService, QueueCollectionService>();
 builder.Services.AddScoped<IQueueCollectionJob, QueueCollectionJob>();
-builder.Services.AddScoped<IQueueTimesCollector, QueueTimesCollector>();
-builder.Services.AddSingleton<QueueObservationFactory>();
 builder.Services.Configure<QueueCollectionOptions>(
     builder.Configuration.GetSection("QueueCollection"));
-
-builder.Services.AddHttpClient<IQueueTimesProvider, QueueTimesClient>(client =>
-{
-    client.BaseAddress = new Uri("https://queue-times.com");
-    client.Timeout = TimeSpan.FromSeconds(30);
-
-    client.DefaultRequestHeaders.UserAgent.ParseAdd(
-        "MagicKingdomQueueWorker/1.0");
-});
 
 var host = builder.Build();
 
@@ -45,6 +35,8 @@ var host = builder.Build();
 
     try
     {
+        var migrator = host.Services.GetRequiredService<IDatabaseMigrator>();
+        await migrator.MigrateAsync();
         logger.LogInformation(
             new EventId(5000, "DatabaseConnectivityCheckStarted"),
             "Database connectivity check started.");

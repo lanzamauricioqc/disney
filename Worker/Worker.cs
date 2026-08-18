@@ -1,10 +1,11 @@
 using System.Diagnostics;
+using Disney.Application;
 using Microsoft.Extensions.Options;
 
-namespace WorkerModels;
+namespace Disney.Worker;
 
-public sealed class Worker(
-    ILogger<Worker> logger,
+public sealed class QueueCollectionWorker(
+    ILogger<QueueCollectionWorker> logger,
     IServiceScopeFactory scopeFactory,
     IOptions<QueueCollectionOptions> options) : BackgroundService
 {
@@ -13,7 +14,6 @@ public sealed class Worker(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation(
-            LogEvents.WorkerStarted,
             "Queue-time worker started with a collection interval of {CollectionIntervalMs} ms.",
             _collectionInterval.TotalMilliseconds);
 
@@ -27,7 +27,6 @@ public sealed class Worker(
             try
             {
                 logger.LogInformation(
-                    LogEvents.CollectionCycleStarted,
                     "Queue-time collection cycle started.");
 
                 using var serviceScope = scopeFactory.CreateScope();
@@ -35,7 +34,6 @@ public sealed class Worker(
                 await job.ExecuteAsync(stoppingToken);
 
                 logger.LogInformation(
-                    LogEvents.CollectionCycleCompleted,
                     "Queue-time collection cycle completed in {ElapsedMs} ms.",
                     stopwatch.ElapsedMilliseconds);
             }
@@ -46,7 +44,6 @@ public sealed class Worker(
             catch (Exception ex)
             {
                 logger.LogError(
-                    LogEvents.CollectionCycleFailed,
                     ex,
                     "Queue-time collection cycle failed after {ElapsedMs} ms.",
                     stopwatch.ElapsedMilliseconds);
@@ -63,7 +60,6 @@ public sealed class Worker(
         }
 
         logger.LogInformation(
-            LogEvents.WorkerStopping,
-            "Queue-time worker is stopping.");
+                "Queue-time worker is stopping.");
     }
 }

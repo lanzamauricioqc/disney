@@ -2,6 +2,10 @@
 
 # Used when running from Visual Studio in Fast mode
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 WORKDIR /app
 
@@ -17,8 +21,9 @@ COPY ["NuGet.Config", "./"]
 
 # Copy project files first to take advantage of Docker layer caching
 COPY ["Worker/Worker.csproj", "Worker/"]
-COPY ["Repositories/Repositories.csproj", "Repositories/"]
-COPY ["Persistence.PostgreSql.Dapper/Persistence.PostgreSql.Dapper.csproj", "Persistence.PostgreSql.Dapper/"]
+COPY ["Disney.Domain/Disney.Domain.csproj", "Disney.Domain/"]
+COPY ["Disney.Application/Disney.Application.csproj", "Disney.Application/"]
+COPY ["Disney.Infrastructure/Disney.Infrastructure.csproj", "Disney.Infrastructure/"]
 
 # Credentials are available only during this RUN
 RUN --mount=type=secret,id=nuget_credentials,env=NuGetPackageSourceCredentials_NordicTech \

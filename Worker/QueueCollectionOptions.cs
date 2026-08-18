@@ -1,4 +1,4 @@
-namespace WorkerModels;
+namespace Disney.Worker;
 
 public sealed class QueueCollectionOptions
 {
