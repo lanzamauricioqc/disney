@@ -1,5 +1,8 @@
 namespace Repositories;
 
-public interface IAttractionsRepository : IRepository<Attraction, int>
+public interface IAttractionsRepository
 {
+    IReadOnlyList<Attraction> GetByParkId(int parkId);
+
+    Attraction Upsert(Attraction entity);
 }

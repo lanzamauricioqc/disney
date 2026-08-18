@@ -6,30 +6,7 @@ namespace Persistence.PostgreSql.Dapper;
 internal sealed class QueueObservationsRepository(IDbConnectionFactory connectionFactory)
     : IQueueObservationsRepository
 {
-    private const string SelectColumns =
-        "id, collection_run_id AS CollectionRunId, park_id AS ParkId, land_id AS LandId, " +
-        "attraction_id AS AttractionId, collected_at AS CollectedAt, " +
-        "observed_local_date AS ObservedLocalDate, observed_local_time AS ObservedLocalTime, " +
-        "observed_local_hour AS ObservedLocalHour, observed_slot_minutes AS ObservedSlotMinutes, " +
-        "observed_day_of_week AS ObservedDayOfWeek, is_open AS IsOpen, wait_minutes AS WaitMinutes, " +
-        "source_last_updated AS SourceLastUpdated, created_at AS CreatedAt";
-
-    public IEnumerable<QueueObservation> GetAll()
-    {
-        using var connection = connectionFactory.CreateConnection();
-        return connection.Query<QueueObservation>(
-            $"SELECT {SelectColumns} FROM public.queue_observations").ToList();
-    }
-
-    public QueueObservation? GetById(int id)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        return connection.QuerySingleOrDefault<QueueObservation>(
-            $"SELECT {SelectColumns} FROM public.queue_observations WHERE id = @Id",
-            new { Id = id });
-    }
-
-    public QueueObservation InsertOrUpdate(QueueObservation entity)
+    public QueueObservation Upsert(QueueObservation entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
 
@@ -70,7 +47,4 @@ internal sealed class QueueObservationsRepository(IDbConnectionFactory connectio
 
         return connection.QuerySingle<QueueObservation>(sql, entity);
     }
-
-    public bool DeleteById(int id) =>
-        throw new NotSupportedException("Delete is not supported for queue observations.");
 }

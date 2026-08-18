@@ -1,42 +1,33 @@
-﻿using System.Net.Http.Json;
+using System.Net.Http.Json;
 using System.Text.Json;
 
-namespace WorkerModels
+namespace WorkerModels;
+
+public sealed class QueueTimesClient(
+    HttpClient httpClient,
+    ILogger<QueueTimesClient> logger) : IQueueTimesProvider
 {
-    public class QueueTimesClient : IQueueTimesProvider
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        private readonly HttpClient _httpClient;
-        private readonly ILogger<QueueTimesClient> _logger;
+        PropertyNameCaseInsensitive = true
+    };
 
-        private static readonly JsonSerializerOptions JsonOptions = new()
-        {
-            PropertyNameCaseInsensitive = true
-        };
+    public async Task<WaitingTimeModel> GetQueueTimesForParkAsync(
+        int sourceParkId,
+        CancellationToken cancellationToken)
+    {
+        logger.LogDebug("Fetching queue times for source park {ParkId}.", sourceParkId);
 
-        public QueueTimesClient(
-            HttpClient httpClient,
-            ILogger<QueueTimesClient> logger)
-        {
-            _httpClient = httpClient;
-            _logger = logger;
-        }
+        using var response = await httpClient.GetAsync(
+            $"/parks/{sourceParkId}/queue_times.json",
+            cancellationToken);
 
-        public async Task<WaitingTimeModel?> GetQueueTimesForParkAsync(int sourceParkId, CancellationToken cancellationToken)
-        {
-            try
-            {
-                var response = await _httpClient.GetAsync($"/parks/{sourceParkId}/queue_times.json", cancellationToken);
+        response.EnsureSuccessStatusCode();
 
-                response.EnsureSuccessStatusCode();
-
-                return await response.Content.ReadFromJsonAsync<WaitingTimeModel>(JsonOptions, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error fetching queue times for park {ParkId}.", sourceParkId);
-                return null;
-            }
-        }
-
+        return await response.Content.ReadFromJsonAsync<WaitingTimeModel>(
+            JsonOptions,
+            cancellationToken)
+            ?? throw new InvalidDataException(
+                $"Queue-times response for source park {sourceParkId} was empty.");
     }
 }

@@ -6,42 +6,52 @@ namespace Persistence.PostgreSql.Dapper;
 internal sealed class QueueCollectionRunsRepository(IDbConnectionFactory connectionFactory)
     : IQueueCollectionRunsRepository
 {
-    private const string SelectColumns =
-        "id, park_id AS ParkId, started_at AS StartedAt, completed_at AS CompletedAt, " +
-        "success, error_message AS ErrorMessage";
-
-    public IEnumerable<QueueCollectionRun> GetAll()
+    public QueueCollectionRun Start(int parkId, DateTimeOffset startedAt)
     {
-        using var connection = connectionFactory.CreateConnection();
-        return connection.Query<QueueCollectionRun>(
-            $"SELECT {SelectColumns} FROM public.queue_collection_runs").ToList();
-    }
-
-    public QueueCollectionRun? GetById(int id)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        return connection.QuerySingleOrDefault<QueueCollectionRun>(
-            $"SELECT {SelectColumns} FROM public.queue_collection_runs WHERE id = @Id",
-            new { Id = id });
-    }
-
-    public QueueCollectionRun InsertOrUpdate(QueueCollectionRun entity)
-    {
-        ArgumentNullException.ThrowIfNull(entity);
-
         using var connection = connectionFactory.CreateConnection();
         const string sql = """
             INSERT INTO public.queue_collection_runs
                 (park_id, started_at, completed_at, success, error_message)
             VALUES
-                (@ParkId, @StartedAt, @CompletedAt, @Success, @ErrorMessage)
+                (@ParkId, @StartedAt, NULL, FALSE, NULL)
             RETURNING id, park_id AS ParkId, started_at AS StartedAt,
                       completed_at AS CompletedAt, success, error_message AS ErrorMessage;
             """;
 
-        return connection.QuerySingle<QueueCollectionRun>(sql, entity);
+        return connection.QuerySingle<QueueCollectionRun>(
+            sql,
+            new { ParkId = parkId, StartedAt = startedAt });
     }
 
-    public bool DeleteById(int id) =>
-        throw new NotSupportedException("Delete is not supported for queue collection runs.");
+    public void Complete(
+        int id,
+        DateTimeOffset completedAt,
+        bool success,
+        string? errorMessage = null)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        const string sql = """
+            UPDATE public.queue_collection_runs
+            SET completed_at = @CompletedAt,
+                success = @Success,
+                error_message = @ErrorMessage
+            WHERE id = @Id;
+            """;
+
+        var updatedRows = connection.Execute(
+            sql,
+            new
+            {
+                Id = id,
+                CompletedAt = completedAt,
+                Success = success,
+                ErrorMessage = errorMessage
+            });
+
+        if (updatedRows != 1)
+        {
+            throw new InvalidOperationException(
+                $"Expected to complete collection run {id}, but updated {updatedRows} rows.");
+        }
+    }
 }

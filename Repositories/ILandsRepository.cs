@@ -1,5 +1,8 @@
 namespace Repositories;
 
-public interface ILandsRepository : IRepository<Land, int>
+public interface ILandsRepository
 {
+    IReadOnlyList<Land> GetByParkId(int parkId);
+
+    Land Upsert(Land entity);
 }

@@ -1,5 +1,6 @@
 namespace Repositories;
 
-public interface IQueueObservationsRepository : IRepository<QueueObservation, int>
+public interface IQueueObservationsRepository
 {
+    QueueObservation Upsert(QueueObservation entity);
 }

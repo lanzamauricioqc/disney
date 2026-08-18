@@ -9,21 +9,15 @@ internal sealed class AttractionsRepository(IDbConnectionFactory connectionFacto
         "id, park_id AS ParkId, current_land_id AS CurrentLandId, source_ride_id AS SourceRideId, " +
         "name, is_active AS IsActive, created_at AS CreatedAt, updated_at AS UpdatedAt";
 
-    public IEnumerable<Attraction> GetAll()
+    public IReadOnlyList<Attraction> GetByParkId(int parkId)
     {
         using var connection = connectionFactory.CreateConnection();
-        return connection.Query<Attraction>($"SELECT {SelectColumns} FROM public.attractions").ToList();
+        return connection.Query<Attraction>(
+            $"SELECT {SelectColumns} FROM public.attractions WHERE park_id = @ParkId",
+            new { ParkId = parkId }).ToList();
     }
 
-    public Attraction? GetById(int id)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        return connection.QuerySingleOrDefault<Attraction>(
-            $"SELECT {SelectColumns} FROM public.attractions WHERE id = @Id",
-            new { Id = id });
-    }
-
-    public Attraction InsertOrUpdate(Attraction entity)
+    public Attraction Upsert(Attraction entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
 
@@ -69,11 +63,5 @@ internal sealed class AttractionsRepository(IDbConnectionFactory connectionFacto
             """;
 
         return connection.QuerySingle<Attraction>(upsertSql, entity);
-    }
-
-    public bool DeleteById(int id)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        return connection.Execute("DELETE FROM public.attractions WHERE id = @Id", new { Id = id }) > 0;
     }
 }

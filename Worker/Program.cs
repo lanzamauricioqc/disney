@@ -7,6 +7,9 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddPostgreSqlDapperPersistence(builder.Configuration);
 
 builder.Services.AddHostedService<Worker>();
+builder.Services.AddScoped<IQueueCollectionJob, QueueCollectionJob>();
+builder.Services.AddScoped<IQueueTimesCollector, QueueTimesCollector>();
+builder.Services.AddSingleton<QueueObservationFactory>();
 
 builder.Services.AddHttpClient<IQueueTimesProvider, QueueTimesClient>(client =>
 {
@@ -35,6 +38,7 @@ var host = builder.Build();
         logger.LogError(
             ex,
             "Database connectivity test failed. Ensure the configured database is available and the connection string is correct.");
+        throw;
     }
 }
 

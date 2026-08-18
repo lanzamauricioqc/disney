@@ -2,7 +2,7 @@ namespace WorkerModels;
 
 public interface IQueueTimesProvider
 {
-    Task<WaitingTimeModel?> GetQueueTimesForParkAsync(
+    Task<WaitingTimeModel> GetQueueTimesForParkAsync(
         int sourceParkId,
         CancellationToken cancellationToken);
 }

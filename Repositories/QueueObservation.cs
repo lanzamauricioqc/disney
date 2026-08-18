@@ -1,53 +1,35 @@
-using System;
-using System.Text.Json.Serialization;
-
 namespace Repositories
 {
     public class QueueObservation
     {
-        [JsonPropertyName("id")]
         public int Id { get; set; }
 
-        [JsonPropertyName("collection_run_id")]
         public int CollectionRunId { get; set; }
 
-        [JsonPropertyName("park_id")]
         public int ParkId { get; set; }
 
-        [JsonPropertyName("land_id")]
         public int? LandId { get; set; }
 
-        [JsonPropertyName("attraction_id")]
         public int? AttractionId { get; set; }
 
-        [JsonPropertyName("collected_at")]
         public DateTimeOffset CollectedAt { get; set; }
 
-        [JsonPropertyName("observed_local_date")]
         public DateOnly ObservedLocalDate { get; set; }
 
-        [JsonPropertyName("observed_local_time")]
         public TimeOnly ObservedLocalTime { get; set; }
 
-        [JsonPropertyName("observed_local_hour")]
         public int ObservedLocalHour { get; set; }
 
-        [JsonPropertyName("observed_slot_minutes")]
         public int ObservedSlotMinutes { get; set; }
 
-        [JsonPropertyName("observed_day_of_week")]
         public int ObservedDayOfWeek { get; set; }
 
-        [JsonPropertyName("is_open")]
         public bool IsOpen { get; set; }
 
-        [JsonPropertyName("wait_minutes")]
         public int? WaitMinutes { get; set; }
 
-        [JsonPropertyName("source_last_updated")]
         public DateTimeOffset? SourceLastUpdated { get; set; }
 
-        [JsonPropertyName("created_at")]
         public DateTimeOffset CreatedAt { get; set; }
     }
 }

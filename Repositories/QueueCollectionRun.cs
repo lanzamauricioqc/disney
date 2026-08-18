@@ -1,26 +1,17 @@
-using System;
-using System.Text.Json.Serialization;
-
 namespace Repositories
 {
     public class QueueCollectionRun
     {
-        [JsonPropertyName("id")]
         public int Id { get; set; }
 
-        [JsonPropertyName("park_id")]
         public int ParkId { get; set; }
 
-        [JsonPropertyName("started_at")]
         public DateTimeOffset? StartedAt { get; set; }
 
-        [JsonPropertyName("completed_at")]
         public DateTimeOffset? CompletedAt { get; set; }
 
-        [JsonPropertyName("success")]
         public bool Success { get; set; }
 
-        [JsonPropertyName("error_message")]
         public string? ErrorMessage { get; set; }
     }
 }

@@ -9,21 +9,15 @@ internal sealed class LandsRepository(IDbConnectionFactory connectionFactory) : 
         "id, park_id AS ParkId, source_land_id AS SourceLandId, name, is_active AS IsActive, " +
         "created_at AS CreatedAt, updated_at AS UpdatedAt";
 
-    public IEnumerable<Land> GetAll()
+    public IReadOnlyList<Land> GetByParkId(int parkId)
     {
         using var connection = connectionFactory.CreateConnection();
-        return connection.Query<Land>($"SELECT {SelectColumns} FROM public.lands").ToList();
+        return connection.Query<Land>(
+            $"SELECT {SelectColumns} FROM public.lands WHERE park_id = @ParkId",
+            new { ParkId = parkId }).ToList();
     }
 
-    public Land? GetById(int id)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        return connection.QuerySingleOrDefault<Land>(
-            $"SELECT {SelectColumns} FROM public.lands WHERE id = @Id",
-            new { Id = id });
-    }
-
-    public Land InsertOrUpdate(Land entity)
+    public Land Upsert(Land entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
 
@@ -62,11 +56,5 @@ internal sealed class LandsRepository(IDbConnectionFactory connectionFactory) : 
             """;
 
         return connection.QuerySingle<Land>(upsertSql, entity);
-    }
-
-    public bool DeleteById(int id)
-    {
-        using var connection = connectionFactory.CreateConnection();
-        return connection.Execute("DELETE FROM public.lands WHERE id = @Id", new { Id = id }) > 0;
     }
 }
