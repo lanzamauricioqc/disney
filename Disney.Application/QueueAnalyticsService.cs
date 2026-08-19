@@ -36,6 +36,27 @@ public sealed class QueueAnalyticsService(
         return new WeekdayWaitTimePatternsResult(parkId, window.From, window.To, patterns);
     }
 
+    public async Task<DailyWaitTimeHistoryResult> GetDailyWaitTimeHistoryAsync(
+        long parkId,
+        long attractionId,
+        CancellationToken cancellationToken)
+    {
+        Validate(parkId, attractionId);
+        var window = CreateWindow();
+        var history = await reader.GetDailyWaitTimeHistoryAsync(
+            parkId,
+            attractionId,
+            window.From,
+            window.To,
+            cancellationToken);
+        return new DailyWaitTimeHistoryResult(
+            parkId,
+            attractionId,
+            window.From,
+            window.To,
+            history);
+    }
+
     public async Task<WeekdayClosurePatternsResult> GetWeekdayClosurePatternsAsync(
         long parkId,
         long? attractionId,

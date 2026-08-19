@@ -1,6 +1,8 @@
 # Build output
 **/bin/
 **/obj/
+**/node_modules/
+**/dist/
 artifacts/
 publish/
 

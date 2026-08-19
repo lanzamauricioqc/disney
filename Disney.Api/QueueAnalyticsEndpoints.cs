@@ -12,9 +12,30 @@ internal static class QueueAnalyticsEndpoints
             .WithTags("Queue analytics");
 
         MapCurrentWaitTimesEndpoint(parkEndpoints);
+        MapDailyWaitTimeHistoryEndpoint(parkEndpoints);
         MapQuarterHourlyWaitTimePatternsEndpoint(parkEndpoints);
         MapQuarterHourlyClosurePatternsEndpoint(parkEndpoints);
         return endpoints;
+    }
+
+    private static void MapDailyWaitTimeHistoryEndpoint(RouteGroupBuilder parkEndpoints)
+    {
+        parkEndpoints.MapGet(
+            "/analytics/wait-times/daily",
+            async (
+                long parkId,
+                long attractionId,
+                IQueueAnalyticsService analyticsService,
+                CancellationToken cancellationToken) =>
+                await ExecuteWithAttractionValidation(
+                    attractionId,
+                    () => analyticsService.GetDailyWaitTimeHistoryAsync(
+                        parkId,
+                        attractionId,
+                        cancellationToken)))
+            .WithName("GetDailyWaitTimeHistory")
+            .WithSummary("Gets daily wait-time history for an attraction")
+            .CacheOutput("analytics");
     }
 
     private static void MapCurrentWaitTimesEndpoint(RouteGroupBuilder parkEndpoints)

@@ -8,6 +8,7 @@ The solution collects attraction queue times and stores an append-only history i
 - `Disney.Application`: collection use cases, persistence/provider abstractions, and historical query contracts.
 - `Disney.Infrastructure`: PostgreSQL/Dapper persistence, Queue-Times HTTP integration, migrations, and historical queries.
 - `Disney.Api`: versioned dashboard endpoints, OpenAPI, health checks, caching, and rate limiting.
+- `frontend`: React, TypeScript, Vite, TanStack Query, and ECharts dashboard served by Nginx.
 - `Worker`: scheduled process and dependency-injection composition.
 - `Disney.Tests`: unit and migration-shape tests.
 
@@ -19,13 +20,16 @@ All analytics use the trailing three months:
 
 ```text
 GET /api/v1/parks/{parkId}/wait-times/current
-GET /api/v1/parks/{parkId}/analytics/wait-times/weekday-hourly
-GET /api/v1/parks/{parkId}/analytics/closures/weekday-hourly
+GET /api/v1/parks
+GET /api/v1/parks/{parkId}/analytics/wait-times/daily?attractionId={attractionId}
+GET /api/v1/parks/{parkId}/analytics/wait-times/weekday-quarter-hourly
+GET /api/v1/parks/{parkId}/analytics/closures/weekday-quarter-hourly
 ```
 
-The analytics endpoints accept an optional `attractionId` query parameter. OpenAPI is
-available at `/openapi/v1.json`, with liveness and readiness at `/health/live` and
-`/health/ready`. Swagger UI is available at `/swagger`.
+The analytics endpoints group local park time into 15-minute buckets and return
+`localHour` and `localMinute`. They accept an optional `attractionId` query parameter.
+OpenAPI is available at `/openapi/v1.json`, with liveness and readiness at
+`/health/live` and `/health/ready`. Swagger UI is available at `/swagger`.
 
 ## Database migrations
 
@@ -48,3 +52,7 @@ Migrations must be forward-only and safe to execute inside a transaction.
 docker compose up -d --build
 dotnet test Disney.slnx
 ```
+
+The dashboard is available at `http://localhost:8081`. For frontend-only development,
+run `npm install` and `npm run dev` from `frontend`; Vite proxies API requests to
+`http://localhost:8080`.

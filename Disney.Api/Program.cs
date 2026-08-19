@@ -11,6 +11,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddOutputCache(options =>
 {
+    options.AddPolicy("parks", policy => policy.Expire(TimeSpan.FromMinutes(30)));
     options.AddPolicy("current-waits", policy => policy.Expire(TimeSpan.FromSeconds(30)));
     options.AddPolicy("analytics", policy => policy.Expire(TimeSpan.FromMinutes(10)));
 });
@@ -71,6 +72,7 @@ application.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = registration => registration.Tags.Contains("ready")
 });
+application.MapParkEndpoints();
 application.MapQueueAnalyticsEndpoints();
 
 await application.Services.GetRequiredService<IDatabaseMigrator>().MigrateAsync();

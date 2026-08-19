@@ -130,6 +130,10 @@ public sealed class ApplicationTests
             1,
             20,
             CancellationToken.None);
+        var dailyHistory = await service.GetDailyWaitTimeHistoryAsync(
+            1,
+            20,
+            CancellationToken.None);
         var closurePatterns = await service.GetWeekdayClosurePatternsAsync(
             1,
             null,
@@ -139,6 +143,8 @@ public sealed class ApplicationTests
         Assert.Equal(currentTime, currentWaitTimes.GeneratedAt);
         Assert.Equal(currentTime.AddMonths(-3), waitTimePatterns.WindowStart);
         Assert.Equal(currentTime, waitTimePatterns.WindowEnd);
+        Assert.Equal(currentTime.AddMonths(-3), dailyHistory.WindowStart);
+        Assert.Equal(currentTime, dailyHistory.WindowEnd);
         Assert.Equal(currentTime.AddMonths(-3), closurePatterns.WindowStart);
         Assert.Equal(20, analyticsReader.AttractionId);
     }
@@ -264,6 +270,17 @@ public sealed class ApplicationTests
         {
             AttractionId = attractionId;
             return Task.FromResult<IReadOnlyList<WeekdayWaitTimePattern>>([]);
+        }
+
+        public Task<IReadOnlyList<DailyWaitTimeHistory>> GetDailyWaitTimeHistoryAsync(
+            long parkId,
+            long attractionId,
+            DateTimeOffset from,
+            DateTimeOffset to,
+            CancellationToken cancellationToken)
+        {
+            AttractionId = attractionId;
+            return Task.FromResult<IReadOnlyList<DailyWaitTimeHistory>>([]);
         }
 
         public Task<IReadOnlyList<WeekdayClosurePattern>> GetWeekdayClosurePatternsAsync(

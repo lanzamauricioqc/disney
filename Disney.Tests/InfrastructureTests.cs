@@ -140,6 +140,7 @@ public sealed class InfrastructureTests
         Assert.Contains("observed_day_of_week", analyticsReaderSourceCode);
         Assert.Contains("observed_slot_minutes / 15", analyticsReaderSourceCode);
         Assert.Contains("AS LocalMinute", analyticsReaderSourceCode);
+        Assert.Contains("observed_local_date AS LocalDate", analyticsReaderSourceCode);
         Assert.Contains("ClosedPercentage", analyticsReaderSourceCode);
     }
 

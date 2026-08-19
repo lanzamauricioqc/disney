@@ -23,6 +23,15 @@ public sealed record WeekdayWaitTimePattern(
     short MaximumWaitMinutes,
     int ObservationCount);
 
+public sealed record DailyWaitTimeHistory(
+    long AttractionId,
+    string AttractionName,
+    DateOnly LocalDate,
+    decimal AverageWaitMinutes,
+    short MinimumWaitMinutes,
+    short MaximumWaitMinutes,
+    int ObservationCount);
+
 public sealed record WeekdayClosurePattern(
     long AttractionId,
     string AttractionName,
@@ -45,6 +54,13 @@ public sealed record WeekdayWaitTimePatternsResult(
     DateTimeOffset WindowEnd,
     IReadOnlyList<WeekdayWaitTimePattern> Patterns);
 
+public sealed record DailyWaitTimeHistoryResult(
+    long ParkId,
+    long AttractionId,
+    DateTimeOffset WindowStart,
+    DateTimeOffset WindowEnd,
+    IReadOnlyList<DailyWaitTimeHistory> History);
+
 public sealed record WeekdayClosurePatternsResult(
     long ParkId,
     DateTimeOffset WindowStart,
@@ -66,6 +82,13 @@ public interface IQueueAnalyticsReader
         DateTimeOffset windowEnd,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<DailyWaitTimeHistory>> GetDailyWaitTimeHistoryAsync(
+        long parkId,
+        long attractionId,
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<WeekdayClosurePattern>> GetWeekdayClosurePatternsAsync(
         long parkId,
         long? attractionId,
@@ -83,6 +106,11 @@ public interface IQueueAnalyticsService
     Task<WeekdayWaitTimePatternsResult> GetWeekdayWaitTimePatternsAsync(
         long parkId,
         long? attractionId,
+        CancellationToken cancellationToken);
+
+    Task<DailyWaitTimeHistoryResult> GetDailyWaitTimeHistoryAsync(
+        long parkId,
+        long attractionId,
         CancellationToken cancellationToken);
 
     Task<WeekdayClosurePatternsResult> GetWeekdayClosurePatternsAsync(

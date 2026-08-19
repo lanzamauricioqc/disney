@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/api/client.ts","./src/api/contracts.ts","./src/components/EChart.tsx","./src/features/dashboard/Dashboard.tsx","./src/features/dashboard/chartOptions.ts","./src/features/dashboard/formatters.test.ts","./src/features/dashboard/formatters.ts"],"version":"5.8.3"}

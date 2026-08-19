@@ -104,6 +104,47 @@ internal sealed class PostgreSqlQueueAnalyticsReader(
         return waitTimePatterns.AsList();
     }
 
+    public async Task<IReadOnlyList<DailyWaitTimeHistory>> GetDailyWaitTimeHistoryAsync(
+        long parkId,
+        long attractionId,
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = connectionFactory.CreateConnection();
+        var history = await connection.QueryAsync<DailyWaitTimeHistory>(new CommandDefinition(
+            """
+            SELECT observation.attraction_id AS AttractionId,
+                   attraction.name AS AttractionName,
+                   observation.observed_local_date AS LocalDate,
+                   ROUND(AVG(observation.wait_minutes), 2) AS AverageWaitMinutes,
+                   MIN(observation.wait_minutes) AS MinimumWaitMinutes,
+                   MAX(observation.wait_minutes) AS MaximumWaitMinutes,
+                   COUNT(*)::int AS ObservationCount
+            FROM public.queue_observations observation
+            JOIN public.attractions attraction
+              ON attraction.id = observation.attraction_id
+            WHERE observation.park_id = @ParkId
+              AND observation.attraction_id = @AttractionId
+              AND observation.observed_at >= @WindowStart
+              AND observation.observed_at <= @WindowEnd
+              AND observation.is_open
+              AND observation.wait_minutes IS NOT NULL
+            GROUP BY observation.attraction_id, attraction.name,
+                     observation.observed_local_date
+            ORDER BY observation.observed_local_date;
+            """,
+            new
+            {
+                ParkId = parkId,
+                AttractionId = attractionId,
+                WindowStart = windowStart,
+                WindowEnd = windowEnd
+            },
+            cancellationToken: cancellationToken));
+        return history.AsList();
+    }
+
     public async Task<IReadOnlyList<WeekdayClosurePattern>> GetWeekdayClosurePatternsAsync(
         long parkId,
         long? attractionId,
