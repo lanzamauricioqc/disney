@@ -55,10 +55,30 @@ internal sealed class PostgreSqlQueueAnalyticsReader(
         var waitTimePatterns =
             await connection.QueryAsync<WeekdayWaitTimePattern>(new CommandDefinition(
             """
+            WITH bucketed_observations AS (
+                SELECT observation.attraction_id,
+                       attraction.name AS attraction_name,
+                       observation.observed_day_of_week,
+                       ((observation.observed_slot_minutes / 15) * 15)::smallint
+                           AS local_slot_minutes,
+                       observation.wait_minutes
+                FROM public.queue_observations observation
+                JOIN public.attractions attraction
+                  ON attraction.id = observation.attraction_id
+                WHERE observation.park_id = @ParkId
+                  AND attraction.is_active
+                  AND observation.observed_at >= @WindowStart
+                  AND observation.observed_at <= @WindowEnd
+                  AND observation.is_open
+                  AND observation.wait_minutes IS NOT NULL
+                  AND (@AttractionId IS NULL
+                       OR observation.attraction_id = @AttractionId)
+            )
             SELECT observation.attraction_id AS AttractionId,
-                   attraction.name AS AttractionName,
+                   observation.attraction_name AS AttractionName,
                    observation.observed_day_of_week::int AS DayOfWeek,
-                   observation.observed_local_hour AS LocalHour,
+                   (observation.local_slot_minutes / 60)::smallint AS LocalHour,
+                   (observation.local_slot_minutes % 60)::smallint AS LocalMinute,
                    ROUND(AVG(observation.wait_minutes), 2) AS AverageWaitMinutes,
                    ROUND(
                        percentile_cont(0.5)
@@ -67,20 +87,11 @@ internal sealed class PostgreSqlQueueAnalyticsReader(
                    MIN(observation.wait_minutes) AS MinimumWaitMinutes,
                    MAX(observation.wait_minutes) AS MaximumWaitMinutes,
                    COUNT(*)::int AS ObservationCount
-            FROM public.queue_observations observation
-            JOIN public.attractions attraction
-              ON attraction.id = observation.attraction_id
-            WHERE observation.park_id = @ParkId
-              AND attraction.is_active
-              AND observation.observed_at >= @WindowStart
-              AND observation.observed_at <= @WindowEnd
-              AND observation.is_open
-              AND observation.wait_minutes IS NOT NULL
-              AND (@AttractionId IS NULL OR observation.attraction_id = @AttractionId)
-            GROUP BY observation.attraction_id, attraction.name,
-                     observation.observed_day_of_week, observation.observed_local_hour
-            ORDER BY attraction.name, observation.observed_day_of_week,
-                     observation.observed_local_hour;
+            FROM bucketed_observations observation
+            GROUP BY observation.attraction_id, observation.attraction_name,
+                     observation.observed_day_of_week, observation.local_slot_minutes
+            ORDER BY observation.attraction_name, observation.observed_day_of_week,
+                     observation.local_slot_minutes;
             """,
             new
             {
@@ -104,29 +115,40 @@ internal sealed class PostgreSqlQueueAnalyticsReader(
         var closurePatterns =
             await connection.QueryAsync<WeekdayClosurePattern>(new CommandDefinition(
             """
+            WITH bucketed_observations AS (
+                SELECT observation.attraction_id,
+                       attraction.name AS attraction_name,
+                       observation.observed_day_of_week,
+                       ((observation.observed_slot_minutes / 15) * 15)::smallint
+                           AS local_slot_minutes,
+                       observation.is_open
+                FROM public.queue_observations observation
+                JOIN public.attractions attraction
+                  ON attraction.id = observation.attraction_id
+                WHERE observation.park_id = @ParkId
+                  AND attraction.is_active
+                  AND observation.observed_at >= @WindowStart
+                  AND observation.observed_at <= @WindowEnd
+                  AND (@AttractionId IS NULL
+                       OR observation.attraction_id = @AttractionId)
+            )
             SELECT observation.attraction_id AS AttractionId,
-                   attraction.name AS AttractionName,
+                   observation.attraction_name AS AttractionName,
                    observation.observed_day_of_week::int AS DayOfWeek,
-                   observation.observed_local_hour AS LocalHour,
+                   (observation.local_slot_minutes / 60)::smallint AS LocalHour,
+                   (observation.local_slot_minutes % 60)::smallint AS LocalMinute,
                    COUNT(*) FILTER (WHERE NOT observation.is_open)::int
                        AS ClosedObservationCount,
                    COUNT(*)::int AS TotalObservationCount,
                    ROUND(
                        COUNT(*) FILTER (WHERE NOT observation.is_open) * 100.0 / COUNT(*),
                        2) AS ClosedPercentage
-            FROM public.queue_observations observation
-            JOIN public.attractions attraction
-              ON attraction.id = observation.attraction_id
-            WHERE observation.park_id = @ParkId
-              AND attraction.is_active
-              AND observation.observed_at >= @WindowStart
-              AND observation.observed_at <= @WindowEnd
-              AND (@AttractionId IS NULL OR observation.attraction_id = @AttractionId)
-            GROUP BY observation.attraction_id, attraction.name,
-                     observation.observed_day_of_week, observation.observed_local_hour
+            FROM bucketed_observations observation
+            GROUP BY observation.attraction_id, observation.attraction_name,
+                     observation.observed_day_of_week, observation.local_slot_minutes
             HAVING COUNT(*) FILTER (WHERE NOT observation.is_open) > 0
-            ORDER BY attraction.name, observation.observed_day_of_week,
-                     observation.observed_local_hour;
+            ORDER BY observation.attraction_name, observation.observed_day_of_week,
+                     observation.local_slot_minutes;
             """,
             new
             {

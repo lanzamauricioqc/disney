@@ -12,8 +12,8 @@ internal static class QueueAnalyticsEndpoints
             .WithTags("Queue analytics");
 
         MapCurrentWaitTimesEndpoint(parkEndpoints);
-        MapWaitTimePatternsEndpoint(parkEndpoints);
-        MapClosurePatternsEndpoint(parkEndpoints);
+        MapQuarterHourlyWaitTimePatternsEndpoint(parkEndpoints);
+        MapQuarterHourlyClosurePatternsEndpoint(parkEndpoints);
         return endpoints;
     }
 
@@ -33,10 +33,11 @@ internal static class QueueAnalyticsEndpoints
             .CacheOutput("current-waits");
     }
 
-    private static void MapWaitTimePatternsEndpoint(RouteGroupBuilder parkEndpoints)
+    private static void MapQuarterHourlyWaitTimePatternsEndpoint(
+        RouteGroupBuilder parkEndpoints)
     {
         parkEndpoints.MapGet(
-            "/analytics/wait-times/weekday-hourly",
+            "/analytics/wait-times/weekday-quarter-hourly",
             async (
                 long parkId,
                 long? attractionId,
@@ -48,15 +49,16 @@ internal static class QueueAnalyticsEndpoints
                         parkId,
                         attractionId,
                         cancellationToken)))
-            .WithName("GetWeekdayHourlyWaitPatterns")
-            .WithSummary("Gets hourly wait-time patterns grouped by weekday")
+            .WithName("GetWeekdayQuarterHourlyWaitPatterns")
+            .WithSummary("Gets 15-minute wait-time patterns grouped by weekday")
             .CacheOutput("analytics");
     }
 
-    private static void MapClosurePatternsEndpoint(RouteGroupBuilder parkEndpoints)
+    private static void MapQuarterHourlyClosurePatternsEndpoint(
+        RouteGroupBuilder parkEndpoints)
     {
         parkEndpoints.MapGet(
-            "/analytics/closures/weekday-hourly",
+            "/analytics/closures/weekday-quarter-hourly",
             async (
                 long parkId,
                 long? attractionId,
@@ -68,8 +70,8 @@ internal static class QueueAnalyticsEndpoints
                         parkId,
                         attractionId,
                         cancellationToken)))
-            .WithName("GetWeekdayHourlyClosurePatterns")
-            .WithSummary("Gets hourly closure frequency grouped by weekday")
+            .WithName("GetWeekdayQuarterHourlyClosurePatterns")
+            .WithSummary("Gets 15-minute closure frequency grouped by weekday")
             .CacheOutput("analytics");
     }
 

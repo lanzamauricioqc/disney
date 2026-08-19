@@ -16,6 +16,7 @@ public sealed record WeekdayWaitTimePattern(
     string AttractionName,
     DayOfWeek DayOfWeek,
     short LocalHour,
+    short LocalMinute,
     decimal AverageWaitMinutes,
     decimal MedianWaitMinutes,
     short MinimumWaitMinutes,
@@ -27,6 +28,7 @@ public sealed record WeekdayClosurePattern(
     string AttractionName,
     DayOfWeek DayOfWeek,
     short LocalHour,
+    short LocalMinute,
     int ClosedObservationCount,
     int TotalObservationCount,
     decimal ClosedPercentage);

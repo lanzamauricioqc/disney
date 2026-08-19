@@ -9,6 +9,11 @@ public sealed class QueueObservation
     public long AttractionId { get; init; }
     public DateTimeOffset CollectedAt { get; init; }
     public DateTimeOffset ObservedAt { get; init; }
+    public DateOnly ObservedUtcDate { get; init; }
+    public TimeOnly ObservedUtcTime { get; init; }
+    public short ObservedUtcHour { get; init; }
+    public short ObservedUtcSlotMinutes { get; init; }
+    public short ObservedUtcDayOfWeek { get; init; }
     public DateOnly ObservedLocalDate { get; init; }
     public TimeOnly ObservedLocalTime { get; init; }
     public short ObservedLocalHour { get; init; }

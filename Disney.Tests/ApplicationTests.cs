@@ -19,9 +19,33 @@ public sealed class ApplicationTests
             observedAt.AddMinutes(1));
 
         Assert.Equal(observedAt, observation.ObservedAt);
+        Assert.Equal(new DateOnly(2026, 8, 18), observation.ObservedUtcDate);
+        Assert.Equal(new TimeOnly(19, 5, 30), observation.ObservedUtcTime);
+        Assert.Equal(19, observation.ObservedUtcHour);
+        Assert.Equal(1145, observation.ObservedUtcSlotMinutes);
+        Assert.Equal((short)DayOfWeek.Tuesday, observation.ObservedUtcDayOfWeek);
         Assert.Equal(15, observation.ObservedLocalHour);
         Assert.Equal(905, observation.ObservedSlotMinutes);
         Assert.Equal((short)35, observation.WaitMinutes);
+    }
+
+    [Fact]
+    public void ObservationFactory_NormalizesOffsetTimestampForUtcComponents()
+    {
+        var observedAt =
+            new DateTimeOffset(2026, 8, 18, 15, 5, 30, TimeSpan.FromHours(-4));
+        var observation = new QueueObservationFactory().Create(
+            1,
+            CreatePark(),
+            2,
+            3,
+            new QueueRideSnapshot(20, "Space Mountain", true, 35, observedAt),
+            observedAt);
+
+        Assert.Equal(new DateOnly(2026, 8, 18), observation.ObservedUtcDate);
+        Assert.Equal(new TimeOnly(19, 5, 30), observation.ObservedUtcTime);
+        Assert.Equal(19, observation.ObservedUtcHour);
+        Assert.Equal(1145, observation.ObservedUtcSlotMinutes);
     }
 
     [Fact]

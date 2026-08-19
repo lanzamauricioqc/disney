@@ -102,7 +102,28 @@ public sealed class InfrastructureTests
     }
 
     [Fact]
-    public void AnalyticsReader_UsesWeekdayHourlyAggregates()
+    public void UtcComponentsMigration_BackfillsFromUtcInstant()
+    {
+        var migrationPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Disney.Infrastructure",
+            "Migrations",
+            "003_add_observation_utc_components.sql");
+        var migrationSql = File.ReadAllText(Path.GetFullPath(migrationPath));
+
+        Assert.Contains("observed_utc_date date", migrationSql);
+        Assert.Contains("observed_utc_time time", migrationSql);
+        Assert.Contains("observed_utc_slot_minutes smallint", migrationSql);
+        Assert.Contains("observed_at AT TIME ZONE 'UTC'", migrationSql);
+        Assert.Contains("observed_utc_date SET NOT NULL", migrationSql);
+    }
+
+    [Fact]
+    public void AnalyticsReader_UsesWeekdayQuarterHourlyAggregates()
     {
         var analyticsReaderPath = Path.Combine(
             AppContext.BaseDirectory,
@@ -117,7 +138,8 @@ public sealed class InfrastructureTests
 
         Assert.Contains("percentile_cont(0.5)", analyticsReaderSourceCode);
         Assert.Contains("observed_day_of_week", analyticsReaderSourceCode);
-        Assert.Contains("observed_local_hour", analyticsReaderSourceCode);
+        Assert.Contains("observed_slot_minutes / 15", analyticsReaderSourceCode);
+        Assert.Contains("AS LocalMinute", analyticsReaderSourceCode);
         Assert.Contains("ClosedPercentage", analyticsReaderSourceCode);
     }
 

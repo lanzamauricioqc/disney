@@ -337,12 +337,16 @@ internal sealed class PostgreSqlQueueCollectionStore(
             """
             INSERT INTO public.queue_observations
                 (collection_run_id, park_id, land_id, attraction_id, collected_at,
-                 observed_at, observed_local_date, observed_local_time,
+                 observed_at, observed_utc_date, observed_utc_time,
+                 observed_utc_hour, observed_utc_slot_minutes,
+                 observed_utc_day_of_week, observed_local_date, observed_local_time,
                  observed_local_hour, observed_slot_minutes, observed_day_of_week,
                  is_open, wait_minutes, created_at)
             VALUES
                 (@CollectionRunId, @ParkId, @LandId, @AttractionId, @CollectedAt,
-                 @ObservedAt, @ObservedLocalDate, @ObservedLocalTime,
+                 @ObservedAt, @ObservedUtcDate, @ObservedUtcTime,
+                 @ObservedUtcHour, @ObservedUtcSlotMinutes,
+                 @ObservedUtcDayOfWeek, @ObservedLocalDate, @ObservedLocalTime,
                  @ObservedLocalHour, @ObservedSlotMinutes, @ObservedDayOfWeek,
                  @IsOpen, @WaitMinutes, @CreatedAt)
             ON CONFLICT (attraction_id, observed_at) DO NOTHING;
