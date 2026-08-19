@@ -48,32 +48,32 @@ builder.Services.AddScoped<IQueueAnalyticsService, QueueAnalyticsService>();
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
-var app = builder.Build();
+var application = builder.Build();
 
-app.UseExceptionHandler();
-app.UseRateLimiter();
-app.UseCors();
-app.UseOutputCache();
-app.UseSwaggerUI(options =>
+application.UseExceptionHandler();
+application.UseRateLimiter();
+application.UseCors();
+application.UseOutputCache();
+application.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/openapi/v1.json", "Disney Queue Analytics API v1");
     options.RoutePrefix = "swagger";
 });
 
-app.MapOpenApi();
-app.MapGet("/", () => Results.Redirect("/swagger"))
+application.MapOpenApi();
+application.MapGet("/", () => Results.Redirect("/swagger"))
     .ExcludeFromDescription();
-app.MapHealthChecks("/health/live", new HealthCheckOptions
+application.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = _ => false
 });
-app.MapHealthChecks("/health/ready", new HealthCheckOptions
+application.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = registration => registration.Tags.Contains("ready")
 });
-app.MapQueueAnalyticsEndpoints();
+application.MapQueueAnalyticsEndpoints();
 
-await app.Services.GetRequiredService<IDatabaseMigrator>().MigrateAsync();
-app.Run();
+await application.Services.GetRequiredService<IDatabaseMigrator>().MigrateAsync();
+application.Run();
 
 public partial class Program;

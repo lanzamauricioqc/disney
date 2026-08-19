@@ -6,20 +6,20 @@ namespace Disney.Application;
 
 public sealed class QueueCollectionService(
     IQueueTimesProvider queueTimesProvider,
-    IQueueCollectionStore store,
+    IQueueCollectionStore collectionStore,
     ILogger<QueueCollectionService> logger) : IQueueCollectionService
 {
     public async Task<CollectionResult> CollectAsync(
         Park park,
         CancellationToken cancellationToken)
     {
-        var runId = await store.StartRunAsync(
+        var runId = await collectionStore.StartRunAsync(
             park.Id,
             DateTimeOffset.UtcNow,
             cancellationToken);
         var stopwatch = Stopwatch.StartNew();
 
-        using var scope = logger.BeginScope(new Dictionary<string, object>
+        using var loggingScope = logger.BeginScope(new Dictionary<string, object>
         {
             ["CollectionRunId"] = runId,
             ["ParkId"] = park.Id,
@@ -31,7 +31,7 @@ public sealed class QueueCollectionService(
             var snapshot = await queueTimesProvider.GetQueueTimesForParkAsync(
                 park.SourceParkId,
                 cancellationToken);
-            var result = await store.PersistSuccessfulRunAsync(
+            var collectionResult = await collectionStore.PersistSuccessfulRunAsync(
                 runId,
                 park,
                 snapshot,
@@ -39,19 +39,22 @@ public sealed class QueueCollectionService(
                 cancellationToken);
 
             logger.LogInformation(
-                "Collection run completed in {ElapsedMs} ms with {ObservationCount} new observations.",
+                "Collection run completed in {ElapsedMilliseconds} ms with {ObservationCount} new observations.",
                 stopwatch.ElapsedMilliseconds,
-                result.ObservationCount);
-            return result;
+                collectionResult.ObservationCount);
+            return collectionResult;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            await store.FailRunAsync(
+            await collectionStore.FailRunAsync(
                 runId,
                 DateTimeOffset.UtcNow,
-                ex.Message,
+                exception.Message,
                 CancellationToken.None);
-            logger.LogError(ex, "Collection run failed after {ElapsedMs} ms.", stopwatch.ElapsedMilliseconds);
+            logger.LogError(
+                exception,
+                "Collection run failed after {ElapsedMilliseconds} ms.",
+                stopwatch.ElapsedMilliseconds);
             throw;
         }
     }

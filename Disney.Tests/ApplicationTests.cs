@@ -42,82 +42,88 @@ public sealed class ApplicationTests
     [Fact]
     public async Task CollectionService_PersistsSuccessfulSnapshot()
     {
-        var store = new FakeStore();
+        var collectionStore = new FakeQueueCollectionStore();
         var snapshot = CreateSnapshot();
         var service = new QueueCollectionService(
-            new StubProvider(snapshot),
-            store,
+            new StubQueueTimesProvider(snapshot),
+            collectionStore,
             NullLogger<QueueCollectionService>.Instance);
 
-        var result = await service.CollectAsync(CreatePark(), CancellationToken.None);
+        var collectionResult = await service.CollectAsync(
+            CreatePark(),
+            CancellationToken.None);
 
-        Assert.Equal(42, result.CollectionRunId);
-        Assert.Same(snapshot, store.Snapshot);
-        Assert.Null(store.Failure);
+        Assert.Equal(42, collectionResult.CollectionRunId);
+        Assert.Same(snapshot, collectionStore.Snapshot);
+        Assert.Null(collectionStore.Failure);
     }
 
     [Fact]
     public async Task CollectionService_MarksFailedRun()
     {
-        var store = new FakeStore();
+        var collectionStore = new FakeQueueCollectionStore();
         var service = new QueueCollectionService(
-            new ThrowingProvider(),
-            store,
+            new ThrowingQueueTimesProvider(),
+            collectionStore,
             NullLogger<QueueCollectionService>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.CollectAsync(CreatePark(), CancellationToken.None));
 
-        Assert.Equal("provider failed", store.Failure);
+        Assert.Equal("provider failed", collectionStore.Failure);
     }
 
     [Fact]
     public async Task CollectionJob_ContinuesAfterOneParkFails()
     {
-        var service = new FakeCollectionService();
-        var job = new QueueCollectionJob(
+        var collectionService = new FakeQueueCollectionService();
+        var collectionJob = new QueueCollectionJob(
             new StubParkReader(
                 CreatePark(1, 6),
                 CreatePark(2, 0),
                 CreatePark(3, 7)),
-            service,
+            collectionService,
             NullLogger<QueueCollectionJob>.Instance);
 
-        await job.ExecuteAsync(CancellationToken.None);
+        await collectionJob.ExecuteAsync(CancellationToken.None);
 
-        Assert.Equal([1L, 3L], service.ParkIds);
+        Assert.Equal([1L, 3L], collectionService.ParkIds);
     }
 
     [Fact]
     public async Task AnalyticsService_UsesTrailingThreeMonthWindow()
     {
-        var now = new DateTimeOffset(2026, 8, 18, 22, 0, 0, TimeSpan.Zero);
-        var reader = new FakeAnalyticsReader();
-        var service = new QueueAnalyticsService(reader, new FixedTimeProvider(now));
+        var currentTime = new DateTimeOffset(2026, 8, 18, 22, 0, 0, TimeSpan.Zero);
+        var analyticsReader = new FakeQueueAnalyticsReader();
+        var service = new QueueAnalyticsService(
+            analyticsReader,
+            new FixedTimeProvider(currentTime));
 
-        var current = await service.GetCurrentWaitTimesAsync(1, CancellationToken.None);
-        var waits = await service.GetWeekdayWaitTimePatternsAsync(
+        var currentWaitTimes = await service.GetCurrentWaitTimesAsync(
+            1,
+            CancellationToken.None);
+        var waitTimePatterns = await service.GetWeekdayWaitTimePatternsAsync(
             1,
             20,
             CancellationToken.None);
-        var closures = await service.GetWeekdayClosurePatternsAsync(
+        var closurePatterns = await service.GetWeekdayClosurePatternsAsync(
             1,
             null,
             CancellationToken.None);
 
-        Assert.Equal(now.AddMonths(-3), current.WindowStart);
-        Assert.Equal(now, current.GeneratedAt);
-        Assert.Equal(now.AddMonths(-3), waits.WindowStart);
-        Assert.Equal(now, waits.WindowEnd);
-        Assert.Equal(now.AddMonths(-3), closures.WindowStart);
-        Assert.Equal(20, reader.AttractionId);
+        Assert.Equal(currentTime.AddMonths(-3), currentWaitTimes.WindowStart);
+        Assert.Equal(currentTime, currentWaitTimes.GeneratedAt);
+        Assert.Equal(currentTime.AddMonths(-3), waitTimePatterns.WindowStart);
+        Assert.Equal(currentTime, waitTimePatterns.WindowEnd);
+        Assert.Equal(currentTime.AddMonths(-3), closurePatterns.WindowStart);
+        Assert.Equal(20, analyticsReader.AttractionId);
     }
 
     [Fact]
     public async Task AnalyticsService_RejectsInvalidIdentifiers()
     {
         var service = new QueueAnalyticsService(
-            new FakeAnalyticsReader(),
+            new FakeQueueAnalyticsReader(),
             new FixedTimeProvider(DateTimeOffset.UtcNow));
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
@@ -143,14 +149,15 @@ public sealed class ApplicationTests
             [new QueueLandSnapshot(10, "Tomorrowland", [])],
             [new QueueRideSnapshot(20, "Space Mountain", true, 25, DateTimeOffset.UtcNow)]);
 
-    private sealed class StubProvider(QueueTimesSnapshot snapshot) : IQueueTimesProvider
+    private sealed class StubQueueTimesProvider(QueueTimesSnapshot snapshot)
+        : IQueueTimesProvider
     {
         public Task<QueueTimesSnapshot> GetQueueTimesForParkAsync(
             int sourceParkId,
             CancellationToken cancellationToken) => Task.FromResult(snapshot);
     }
 
-    private sealed class ThrowingProvider : IQueueTimesProvider
+    private sealed class ThrowingQueueTimesProvider : IQueueTimesProvider
     {
         public Task<QueueTimesSnapshot> GetQueueTimesForParkAsync(
             int sourceParkId,
@@ -159,7 +166,7 @@ public sealed class ApplicationTests
                 new InvalidOperationException("provider failed"));
     }
 
-    private sealed class FakeStore : IQueueCollectionStore
+    private sealed class FakeQueueCollectionStore : IQueueCollectionStore
     {
         public QueueTimesSnapshot? Snapshot { get; private set; }
         public string? Failure { get; private set; }
@@ -197,7 +204,7 @@ public sealed class ApplicationTests
             Task.FromResult<IReadOnlyList<Park>>(parks);
     }
 
-    private sealed class FakeCollectionService : IQueueCollectionService
+    private sealed class FakeQueueCollectionService : IQueueCollectionService
     {
         public List<long> ParkIds { get; } = [];
 
@@ -213,7 +220,7 @@ public sealed class ApplicationTests
         }
     }
 
-    private sealed class FakeAnalyticsReader : IQueueAnalyticsReader
+    private sealed class FakeQueueAnalyticsReader : IQueueAnalyticsReader
     {
         public long? AttractionId { get; private set; }
 

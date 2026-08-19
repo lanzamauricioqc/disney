@@ -38,100 +38,61 @@ internal sealed class PostgreSqlQueueCollectionStore(
 
         try
         {
-            await connection.ExecuteAsync(new CommandDefinition(
-                "SELECT pg_advisory_xact_lock(@ParkId);",
-                new { ParkId = park.Id },
+            await AcquireParkLockAsync(
+                connection,
                 transaction,
-                cancellationToken: cancellationToken));
+                park.Id,
+                cancellationToken);
 
-            var returnedLandIds = snapshot.Lands.Select(x => x.SourceLandId).ToHashSet();
+            var returnedLandIds = snapshot.Lands
+                .Select(land => land.SourceLandId)
+                .ToHashSet();
             var processedRideIds = new HashSet<int>();
-            var observationCount = 0;
-
-            foreach (var landSnapshot in snapshot.Lands)
-            {
-                var land = await UpsertLandAsync(
-                    connection,
-                    transaction,
-                    park.Id,
-                    landSnapshot,
-                    cancellationToken);
-                foreach (var ride in landSnapshot.Rides)
-                {
-                    observationCount += await SaveRideAsync(
-                        connection,
-                        transaction,
-                        runId,
-                        park,
-                        land.Id,
-                        ride,
-                        collectedAt,
-                        cancellationToken);
-                    processedRideIds.Add(ride.SourceRideId);
-                }
-            }
-
-            foreach (var ride in snapshot.Rides.Where(x => processedRideIds.Add(x.SourceRideId)))
-            {
-                observationCount += await SaveRideAsync(
-                    connection,
-                    transaction,
-                    runId,
-                    park,
-                    null,
-                    ride,
-                    collectedAt,
-                    cancellationToken);
-            }
-
-            var deactivatedLands = await connection.ExecuteAsync(new CommandDefinition(
-                """
-                UPDATE public.lands
-                SET is_active = FALSE, updated_at = @Now
-                WHERE park_id = @ParkId AND is_active
-                  AND NOT (source_land_id = ANY(@ReturnedLandIds));
-                """,
-                new
-                {
-                    ParkId = park.Id,
-                    ReturnedLandIds = returnedLandIds.ToArray(),
-                    Now = collectedAt
-                },
+            var landObservationCount = await SaveLandRidesAsync(
+                connection,
                 transaction,
-                cancellationToken: cancellationToken));
-
-            var deactivatedAttractions = await connection.ExecuteAsync(new CommandDefinition(
-                """
-                UPDATE public.attractions
-                SET is_active = FALSE, updated_at = @Now
-                WHERE park_id = @ParkId AND is_active
-                  AND NOT (source_ride_id = ANY(@ProcessedRideIds));
-                """,
-                new
-                {
-                    ParkId = park.Id,
-                    ProcessedRideIds = processedRideIds.ToArray(),
-                    Now = collectedAt
-                },
+                runId,
+                park,
+                snapshot.Lands,
+                processedRideIds,
+                collectedAt,
+                cancellationToken);
+            var topLevelObservationCount = await SaveTopLevelRidesAsync(
+                connection,
                 transaction,
-                cancellationToken: cancellationToken));
-
-            await connection.ExecuteAsync(new CommandDefinition(
-                """
-                UPDATE public.queue_collection_runs
-                SET completed_at = @CompletedAt, success = TRUE, error_message = NULL
-                WHERE id = @RunId;
-                """,
-                new { RunId = runId, CompletedAt = DateTimeOffset.UtcNow },
+                runId,
+                park,
+                snapshot.Rides,
+                processedRideIds,
+                collectedAt,
+                cancellationToken);
+            var deactivatedLands = await DeactivateMissingLandsAsync(
+                connection,
                 transaction,
-                cancellationToken: cancellationToken));
+                park.Id,
+                returnedLandIds,
+                collectedAt,
+                cancellationToken);
+            var deactivatedAttractions = await DeactivateMissingAttractionsAsync(
+                connection,
+                transaction,
+                park.Id,
+                processedRideIds,
+                collectedAt,
+                cancellationToken);
+
+            await CompleteRunAsync(
+                connection,
+                transaction,
+                runId,
+                cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             return new CollectionResult(
                 runId,
                 snapshot.Lands.Count,
                 processedRideIds.Count,
-                observationCount,
+                landObservationCount + topLevelObservationCount,
                 deactivatedLands,
                 deactivatedAttractions);
         }
@@ -149,7 +110,7 @@ internal sealed class PostgreSqlQueueCollectionStore(
         CancellationToken cancellationToken)
     {
         await using var connection = connectionFactory.CreateConnection();
-        var affected = await connection.ExecuteAsync(new CommandDefinition(
+        var affectedRowCount = await connection.ExecuteAsync(new CommandDefinition(
             """
             UPDATE public.queue_collection_runs
             SET completed_at = @CompletedAt, success = FALSE, error_message = @ErrorMessage
@@ -158,11 +119,179 @@ internal sealed class PostgreSqlQueueCollectionStore(
             new { RunId = runId, CompletedAt = completedAt, ErrorMessage = errorMessage },
             cancellationToken: cancellationToken));
 
-        if (affected != 1)
+        if (affectedRowCount != 1)
         {
             throw new InvalidOperationException($"Collection run {runId} was not found.");
         }
     }
+
+    private static Task AcquireParkLockAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        long parkId,
+        CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(
+            "SELECT pg_advisory_xact_lock(@ParkId);",
+            new { ParkId = parkId },
+            transaction,
+            cancellationToken: cancellationToken));
+
+    private async Task<int> SaveLandRidesAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        long runId,
+        Park park,
+        IReadOnlyList<QueueLandSnapshot> lands,
+        ISet<int> processedRideIds,
+        DateTimeOffset collectedAt,
+        CancellationToken cancellationToken)
+    {
+        var observationCount = 0;
+
+        foreach (var landSnapshot in lands)
+        {
+            observationCount += await SaveLandRidesAsync(
+                connection,
+                transaction,
+                runId,
+                park,
+                landSnapshot,
+                processedRideIds,
+                collectedAt,
+                cancellationToken);
+        }
+
+        return observationCount;
+    }
+
+    private async Task<int> SaveLandRidesAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        long runId,
+        Park park,
+        QueueLandSnapshot landSnapshot,
+        ISet<int> processedRideIds,
+        DateTimeOffset collectedAt,
+        CancellationToken cancellationToken)
+    {
+        var land = await UpsertLandAsync(
+            connection,
+            transaction,
+            park.Id,
+            landSnapshot,
+            cancellationToken);
+        var observationCount = 0;
+
+        foreach (var rideSnapshot in landSnapshot.Rides)
+        {
+            observationCount += await SaveRideAsync(
+                connection,
+                transaction,
+                runId,
+                park,
+                land.Id,
+                rideSnapshot,
+                collectedAt,
+                cancellationToken);
+            processedRideIds.Add(rideSnapshot.SourceRideId);
+        }
+
+        return observationCount;
+    }
+
+    private async Task<int> SaveTopLevelRidesAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        long runId,
+        Park park,
+        IReadOnlyList<QueueRideSnapshot> rides,
+        ISet<int> processedRideIds,
+        DateTimeOffset collectedAt,
+        CancellationToken cancellationToken)
+    {
+        var observationCount = 0;
+
+        foreach (var rideSnapshot in rides)
+        {
+            if (!processedRideIds.Add(rideSnapshot.SourceRideId))
+            {
+                continue;
+            }
+
+            observationCount += await SaveRideAsync(
+                connection,
+                transaction,
+                runId,
+                park,
+                null,
+                rideSnapshot,
+                collectedAt,
+                cancellationToken);
+        }
+
+        return observationCount;
+    }
+
+    private static Task<int> DeactivateMissingLandsAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        long parkId,
+        IReadOnlyCollection<int> returnedLandIds,
+        DateTimeOffset collectedAt,
+        CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE public.lands
+            SET is_active = FALSE, updated_at = @CollectedAt
+            WHERE park_id = @ParkId AND is_active
+              AND NOT (source_land_id = ANY(@ReturnedLandIds));
+            """,
+            new
+            {
+                ParkId = parkId,
+                ReturnedLandIds = returnedLandIds.ToArray(),
+                CollectedAt = collectedAt
+            },
+            transaction,
+            cancellationToken: cancellationToken));
+
+    private static Task<int> DeactivateMissingAttractionsAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        long parkId,
+        IReadOnlyCollection<int> processedRideIds,
+        DateTimeOffset collectedAt,
+        CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE public.attractions
+            SET is_active = FALSE, updated_at = @CollectedAt
+            WHERE park_id = @ParkId AND is_active
+              AND NOT (source_ride_id = ANY(@ProcessedRideIds));
+            """,
+            new
+            {
+                ParkId = parkId,
+                ProcessedRideIds = processedRideIds.ToArray(),
+                CollectedAt = collectedAt
+            },
+            transaction,
+            cancellationToken: cancellationToken));
+
+    private static Task CompleteRunAsync(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        long runId,
+        CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(
+            """
+            UPDATE public.queue_collection_runs
+            SET completed_at = @CompletedAt, success = TRUE, error_message = NULL
+            WHERE id = @RunId;
+            """,
+            new { RunId = runId, CompletedAt = DateTimeOffset.UtcNow },
+            transaction,
+            cancellationToken: cancellationToken));
 
     private async Task<int> SaveRideAsync(
         IDbConnection connection,
@@ -170,7 +299,7 @@ internal sealed class PostgreSqlQueueCollectionStore(
         long runId,
         Park park,
         long? landId,
-        QueueRideSnapshot ride,
+        QueueRideSnapshot rideSnapshot,
         DateTimeOffset collectedAt,
         CancellationToken cancellationToken)
     {
@@ -190,8 +319,8 @@ internal sealed class PostgreSqlQueueCollectionStore(
             {
                 ParkId = park.Id,
                 LandId = landId,
-                ride.SourceRideId,
-                ride.Name
+                rideSnapshot.SourceRideId,
+                rideSnapshot.Name
             },
             transaction,
             cancellationToken: cancellationToken));
@@ -201,7 +330,7 @@ internal sealed class PostgreSqlQueueCollectionStore(
             park,
             landId,
             attractionId,
-            ride,
+            rideSnapshot,
             collectedAt);
 
         return await connection.ExecuteAsync(new CommandDefinition(
@@ -227,7 +356,7 @@ internal sealed class PostgreSqlQueueCollectionStore(
         IDbConnection connection,
         IDbTransaction transaction,
         long parkId,
-        QueueLandSnapshot land,
+        QueueLandSnapshot landSnapshot,
         CancellationToken cancellationToken) =>
         connection.QuerySingleAsync<Land>(new CommandDefinition(
             """
@@ -238,7 +367,7 @@ internal sealed class PostgreSqlQueueCollectionStore(
             RETURNING id, park_id AS ParkId, source_land_id AS SourceLandId, name,
                       is_active AS IsActive, created_at AS CreatedAt, updated_at AS UpdatedAt;
             """,
-            new { ParkId = parkId, land.SourceLandId, land.Name },
+            new { ParkId = parkId, landSnapshot.SourceLandId, landSnapshot.Name },
             transaction,
             cancellationToken: cancellationToken));
 }

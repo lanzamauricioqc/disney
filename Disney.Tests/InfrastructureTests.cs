@@ -31,15 +31,17 @@ public sealed class InfrastructureTests
         {
             BaseAddress = new Uri("https://queue-times.test")
         };
-        var client = new QueueTimesClient(
+        var queueTimesClient = new QueueTimesClient(
             httpClient,
             NullLogger<QueueTimesClient>.Instance);
 
-        var snapshot = await client.GetQueueTimesForParkAsync(6, CancellationToken.None);
+        var snapshot = await queueTimesClient.GetQueueTimesForParkAsync(
+            6,
+            CancellationToken.None);
 
-        var ride = Assert.Single(Assert.Single(snapshot.Lands).Rides);
-        Assert.Equal(20, ride.SourceRideId);
-        Assert.Equal(35, ride.WaitMinutes);
+        var rideSnapshot = Assert.Single(Assert.Single(snapshot.Lands).Rides);
+        Assert.Equal(20, rideSnapshot.SourceRideId);
+        Assert.Equal(35, rideSnapshot.WaitMinutes);
     }
 
     [Fact]
@@ -77,7 +79,7 @@ public sealed class InfrastructureTests
     [Fact]
     public void InitialMigration_DefinesAppendOnlyIdentityAndReadIndexes()
     {
-        var path = Path.Combine(
+        var migrationPath = Path.Combine(
             AppContext.BaseDirectory,
             "..",
             "..",
@@ -86,23 +88,23 @@ public sealed class InfrastructureTests
             "Disney.Infrastructure",
             "Migrations",
             "001_initial_schema.sql");
-        var sql = File.ReadAllText(Path.GetFullPath(path));
+        var migrationSql = File.ReadAllText(Path.GetFullPath(migrationPath));
 
-        Assert.Contains("(attraction_id, observed_at)", sql);
-        Assert.Contains("observed_slot_minutes smallint NOT NULL", sql);
-        Assert.Contains("USING brin (observed_at)", sql);
-        Assert.Contains("duration_minutes", sql);
-        Assert.DoesNotContain("IF NOT EXISTS public.parks", sql);
-        Assert.DoesNotContain("source_last_updated", sql);
+        Assert.Contains("(attraction_id, observed_at)", migrationSql);
+        Assert.Contains("observed_slot_minutes smallint NOT NULL", migrationSql);
+        Assert.Contains("USING brin (observed_at)", migrationSql);
+        Assert.Contains("duration_minutes", migrationSql);
+        Assert.DoesNotContain("IF NOT EXISTS public.parks", migrationSql);
+        Assert.DoesNotContain("source_last_updated", migrationSql);
         Assert.DoesNotContain(
             "UNIQUE (attraction_id, observed_local_date, observed_slot_minutes)",
-            sql);
+            migrationSql);
     }
 
     [Fact]
     public void AnalyticsReader_UsesWeekdayHourlyAggregates()
     {
-        var path = Path.Combine(
+        var analyticsReaderPath = Path.Combine(
             AppContext.BaseDirectory,
             "..",
             "..",
@@ -110,12 +112,13 @@ public sealed class InfrastructureTests
             "..",
             "Disney.Infrastructure",
             "PostgreSqlQueueAnalyticsReader.cs");
-        var source = File.ReadAllText(Path.GetFullPath(path));
+        var analyticsReaderSourceCode =
+            File.ReadAllText(Path.GetFullPath(analyticsReaderPath));
 
-        Assert.Contains("percentile_cont(0.5)", source);
-        Assert.Contains("observed_day_of_week", source);
-        Assert.Contains("observed_local_hour", source);
-        Assert.Contains("ClosedPercentage", source);
+        Assert.Contains("percentile_cont(0.5)", analyticsReaderSourceCode);
+        Assert.Contains("observed_day_of_week", analyticsReaderSourceCode);
+        Assert.Contains("observed_local_hour", analyticsReaderSourceCode);
+        Assert.Contains("ClosedPercentage", analyticsReaderSourceCode);
     }
 
     private sealed class StubHandler(HttpStatusCode statusCode, string content)

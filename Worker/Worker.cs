@@ -14,15 +14,18 @@ public sealed class QueueCollectionWorker(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation(
-            "Queue-time worker started with a collection interval of {CollectionIntervalMs} ms.",
+            "Queue-time worker started with a collection interval of {CollectionIntervalMilliseconds} ms.",
             _collectionInterval.TotalMilliseconds);
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var cycleId = Guid.NewGuid();
+            var collectionCycleId = Guid.NewGuid();
             var stopwatch = Stopwatch.StartNew();
-            using var scope = logger.BeginScope(
-                new Dictionary<string, object> { ["CollectionCycleId"] = cycleId });
+            using var loggingScope = logger.BeginScope(
+                new Dictionary<string, object>
+                {
+                    ["CollectionCycleId"] = collectionCycleId
+                });
 
             try
             {
@@ -30,22 +33,23 @@ public sealed class QueueCollectionWorker(
                     "Queue-time collection cycle started.");
 
                 using var serviceScope = scopeFactory.CreateScope();
-                var job = serviceScope.ServiceProvider.GetRequiredService<IQueueCollectionJob>();
-                await job.ExecuteAsync(stoppingToken);
+                var collectionJob =
+                    serviceScope.ServiceProvider.GetRequiredService<IQueueCollectionJob>();
+                await collectionJob.ExecuteAsync(stoppingToken);
 
                 logger.LogInformation(
-                    "Queue-time collection cycle completed in {ElapsedMs} ms.",
+                    "Queue-time collection cycle completed in {ElapsedMilliseconds} ms.",
                     stopwatch.ElapsedMilliseconds);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
                 logger.LogError(
-                    ex,
-                    "Queue-time collection cycle failed after {ElapsedMs} ms.",
+                    exception,
+                    "Queue-time collection cycle failed after {ElapsedMilliseconds} ms.",
                     stopwatch.ElapsedMilliseconds);
             }
 

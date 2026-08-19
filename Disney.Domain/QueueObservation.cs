@@ -2,19 +2,19 @@ namespace Disney.Domain;
 
 public sealed class QueueObservation
 {
-    public long Id { get; set; }
-    public long CollectionRunId { get; set; }
-    public long ParkId { get; set; }
-    public long? LandId { get; set; }
-    public long AttractionId { get; set; }
-    public DateTimeOffset CollectedAt { get; set; }
-    public DateTimeOffset ObservedAt { get; set; }
-    public DateOnly ObservedLocalDate { get; set; }
-    public TimeOnly ObservedLocalTime { get; set; }
-    public short ObservedLocalHour { get; set; }
-    public short ObservedSlotMinutes { get; set; }
-    public short ObservedDayOfWeek { get; set; }
-    public bool IsOpen { get; set; }
-    public short? WaitMinutes { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
+    public long Id { get; init; }
+    public long CollectionRunId { get; init; }
+    public long ParkId { get; init; }
+    public long? LandId { get; init; }
+    public long AttractionId { get; init; }
+    public DateTimeOffset CollectedAt { get; init; }
+    public DateTimeOffset ObservedAt { get; init; }
+    public DateOnly ObservedLocalDate { get; init; }
+    public TimeOnly ObservedLocalTime { get; init; }
+    public short ObservedLocalHour { get; init; }
+    public short ObservedSlotMinutes { get; init; }
+    public short ObservedDayOfWeek { get; init; }
+    public bool IsOpen { get; init; }
+    public short? WaitMinutes { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
 }

@@ -26,7 +26,7 @@ internal sealed class QueueTimesClient(
             cancellationToken);
 
         logger.LogInformation(
-            "Queue-times request for park {SourceParkId} returned {StatusCode} in {ElapsedMs} ms.",
+            "Queue-times request for park {SourceParkId} returned {StatusCode} in {ElapsedMilliseconds} ms.",
             sourceParkId,
             (int)response.StatusCode,
             stopwatch.ElapsedMilliseconds);
@@ -38,7 +38,8 @@ internal sealed class QueueTimesClient(
             ?? throw new InvalidDataException(
                 $"Queue-times response for source park {sourceParkId} was empty.");
 
-        if (payload.Lands.Sum(x => x.Rides.Count) + payload.Rides.Count == 0)
+        var rideCount = payload.Lands.Sum(land => land.Rides.Count) + payload.Rides.Count;
+        if (rideCount == 0)
         {
             throw new InvalidDataException(
                 $"Queue-times response for source park {sourceParkId} contained no rides.");
@@ -50,7 +51,10 @@ internal sealed class QueueTimesClient(
     }
 
     private static QueueLandSnapshot MapLand(QueueLandResponse land) =>
-        new(land.Id, land.Name, land.Rides.Select(MapRide).ToList());
+        new(
+            land.Id,
+            land.Name,
+            land.Rides.Select(MapRide).ToList());
 
     private static QueueRideSnapshot MapRide(QueueRideResponse ride) =>
         new(ride.Id, ride.Name, ride.IsOpen, ride.WaitTime, ride.LastUpdated);

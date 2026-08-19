@@ -46,11 +46,11 @@ var host = builder.Build();
             new EventId(5001, "DatabaseConnectivityCheckCompleted"),
             "Database connectivity check completed successfully.");
     }
-    catch (Exception ex)
+    catch (Exception exception)
     {
         logger.LogError(
             new EventId(5002, "DatabaseConnectivityCheckFailed"),
-            ex,
+            exception,
             "Database connectivity check failed.");
         throw;
     }

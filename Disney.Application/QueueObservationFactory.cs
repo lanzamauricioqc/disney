@@ -19,11 +19,12 @@ public sealed class QueueObservationFactory
             var timeZone = TimeZoneInfo.FindSystemTimeZoneById(park.Timezone);
             observedLocal = TimeZoneInfo.ConvertTime(ride.ObservedAt, timeZone);
         }
-        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        catch (Exception exception)
+            when (exception is TimeZoneNotFoundException or InvalidTimeZoneException)
         {
             throw new InvalidOperationException(
                 $"Park {park.Id} has invalid timezone '{park.Timezone}'.",
-                ex);
+                exception);
         }
 
         short? waitMinutes = ride.IsOpen

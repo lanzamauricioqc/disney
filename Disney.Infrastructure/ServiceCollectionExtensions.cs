@@ -19,11 +19,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IQueueAnalyticsReader, PostgreSqlQueueAnalyticsReader>();
         services.AddSingleton<QueueObservationFactory>();
 
-        services.AddHttpClient<IQueueTimesProvider, QueueTimesClient>(client =>
+        services.AddHttpClient<IQueueTimesProvider, QueueTimesClient>(httpClient =>
         {
-            client.BaseAddress = new Uri("https://queue-times.com");
-            client.Timeout = TimeSpan.FromSeconds(30);
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("DisneyQueueWorker/2.0");
+            httpClient.BaseAddress = new Uri("https://queue-times.com");
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DisneyQueueWorker/2.0");
         });
 
         return services;

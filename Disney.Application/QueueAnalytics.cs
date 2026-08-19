@@ -53,22 +53,22 @@ public interface IQueueAnalyticsReader
 {
     Task<IReadOnlyList<CurrentWaitTime>> GetCurrentWaitTimesAsync(
         long parkId,
-        DateTimeOffset from,
-        DateTimeOffset to,
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<WeekdayWaitTimePattern>> GetWeekdayWaitTimePatternsAsync(
         long parkId,
         long? attractionId,
-        DateTimeOffset from,
-        DateTimeOffset to,
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<WeekdayClosurePattern>> GetWeekdayClosurePatternsAsync(
         long parkId,
         long? attractionId,
-        DateTimeOffset from,
-        DateTimeOffset to,
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
         CancellationToken cancellationToken);
 }
 

@@ -12,22 +12,23 @@ public sealed class WorkerTests
     public async Task Worker_StopsAfterCancellation()
     {
         using var cancellation = new CancellationTokenSource();
-        var job = new StubJob(cancellation);
+        var collectionJob = new StubQueueCollectionJob(cancellation);
         var services = new ServiceCollection();
-        services.AddScoped<IQueueCollectionJob>(_ => job);
-        using var provider = services.BuildServiceProvider();
-        var worker = new QueueCollectionWorker(
+        services.AddScoped<IQueueCollectionJob>(_ => collectionJob);
+        using var serviceProvider = services.BuildServiceProvider();
+        var collectionWorker = new QueueCollectionWorker(
             NullLogger<QueueCollectionWorker>.Instance,
-            provider.GetRequiredService<IServiceScopeFactory>(),
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             Options.Create(new QueueCollectionOptions { Interval = TimeSpan.Zero }));
 
-        await worker.StartAsync(cancellation.Token);
-        await worker.ExecuteTask!;
+        await collectionWorker.StartAsync(cancellation.Token);
+        await collectionWorker.ExecuteTask!;
 
-        Assert.Equal(2, job.Executions);
+        Assert.Equal(2, collectionJob.Executions);
     }
 
-    private sealed class StubJob(CancellationTokenSource cancellation) : IQueueCollectionJob
+    private sealed class StubQueueCollectionJob(CancellationTokenSource cancellation)
+        : IQueueCollectionJob
     {
         public int Executions { get; private set; }
 

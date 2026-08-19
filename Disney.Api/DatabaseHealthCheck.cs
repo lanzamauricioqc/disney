@@ -15,9 +15,11 @@ internal sealed class DatabaseHealthCheck(
             await database.CheckAsync(cancellationToken);
             return HealthCheckResult.Healthy();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            return HealthCheckResult.Unhealthy("Database connectivity failed.", ex);
+            return HealthCheckResult.Unhealthy(
+                "Database connectivity failed.",
+                exception);
         }
     }
 }

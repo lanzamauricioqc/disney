@@ -54,8 +54,8 @@ public sealed class QueueAnalyticsService(
 
     private (DateTimeOffset From, DateTimeOffset To) CreateWindow()
     {
-        var to = timeProvider.GetUtcNow();
-        return (to.AddMonths(-LookbackMonths), to);
+        var windowEnd = timeProvider.GetUtcNow();
+        return (windowEnd.AddMonths(-LookbackMonths), windowEnd);
     }
 
     private static void Validate(long parkId, long? attractionId)

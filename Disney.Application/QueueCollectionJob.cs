@@ -3,15 +3,15 @@ using Microsoft.Extensions.Logging;
 namespace Disney.Application;
 
 public sealed class QueueCollectionJob(
-    IParkReader parks,
+    IParkReader parkReader,
     IQueueCollectionService collectionService,
     ILogger<QueueCollectionJob> logger) : IQueueCollectionJob
 {
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        var parkList = await parks.GetAllAsync(cancellationToken);
+        var parks = await parkReader.GetAllAsync(cancellationToken);
 
-        foreach (var park in parkList)
+        foreach (var park in parks)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -29,9 +29,13 @@ public sealed class QueueCollectionJob(
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                logger.LogError(ex, "Collection failed for park {ParkId} ({ParkName}).", park.Id, park.Name);
+                logger.LogError(
+                    exception,
+                    "Collection failed for park {ParkId} ({ParkName}).",
+                    park.Id,
+                    park.Name);
             }
         }
     }

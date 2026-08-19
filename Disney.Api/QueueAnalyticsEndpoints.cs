@@ -8,57 +8,69 @@ internal static class QueueAnalyticsEndpoints
     public static IEndpointRouteBuilder MapQueueAnalyticsEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/v1/parks/{parkId:long:min(1)}")
+        var parkEndpoints = endpoints.MapGroup("/api/v1/parks/{parkId:long:min(1)}")
             .WithTags("Queue analytics");
 
-        group.MapGet(
-                "/wait-times/current",
-                async (
-                    long parkId,
-                    IQueueAnalyticsService analytics,
-                    CancellationToken cancellationToken) =>
-                    Results.Ok(await analytics.GetCurrentWaitTimesAsync(
-                        parkId,
-                        cancellationToken)))
+        MapCurrentWaitTimesEndpoint(parkEndpoints);
+        MapWaitTimePatternsEndpoint(parkEndpoints);
+        MapClosurePatternsEndpoint(parkEndpoints);
+        return endpoints;
+    }
+
+    private static void MapCurrentWaitTimesEndpoint(RouteGroupBuilder parkEndpoints)
+    {
+        parkEndpoints.MapGet(
+            "/wait-times/current",
+            async (
+                long parkId,
+                IQueueAnalyticsService analyticsService,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await analyticsService.GetCurrentWaitTimesAsync(
+                    parkId,
+                    cancellationToken)))
             .WithName("GetCurrentWaitTimes")
             .WithSummary("Gets the most recent wait time for each active attraction")
             .CacheOutput("current-waits");
+    }
 
-        group.MapGet(
-                "/analytics/wait-times/weekday-hourly",
-                async (
-                    long parkId,
-                    long? attractionId,
-                    IQueueAnalyticsService analytics,
-                    CancellationToken cancellationToken) =>
-                    await ExecuteWithAttractionValidation(
+    private static void MapWaitTimePatternsEndpoint(RouteGroupBuilder parkEndpoints)
+    {
+        parkEndpoints.MapGet(
+            "/analytics/wait-times/weekday-hourly",
+            async (
+                long parkId,
+                long? attractionId,
+                IQueueAnalyticsService analyticsService,
+                CancellationToken cancellationToken) =>
+                await ExecuteWithAttractionValidation(
+                    attractionId,
+                    () => analyticsService.GetWeekdayWaitTimePatternsAsync(
+                        parkId,
                         attractionId,
-                        () => analytics.GetWeekdayWaitTimePatternsAsync(
-                            parkId,
-                            attractionId,
-                            cancellationToken)))
+                        cancellationToken)))
             .WithName("GetWeekdayHourlyWaitPatterns")
             .WithSummary("Gets hourly wait-time patterns grouped by weekday")
             .CacheOutput("analytics");
+    }
 
-        group.MapGet(
-                "/analytics/closures/weekday-hourly",
-                async (
-                    long parkId,
-                    long? attractionId,
-                    IQueueAnalyticsService analytics,
-                    CancellationToken cancellationToken) =>
-                    await ExecuteWithAttractionValidation(
+    private static void MapClosurePatternsEndpoint(RouteGroupBuilder parkEndpoints)
+    {
+        parkEndpoints.MapGet(
+            "/analytics/closures/weekday-hourly",
+            async (
+                long parkId,
+                long? attractionId,
+                IQueueAnalyticsService analyticsService,
+                CancellationToken cancellationToken) =>
+                await ExecuteWithAttractionValidation(
+                    attractionId,
+                    () => analyticsService.GetWeekdayClosurePatternsAsync(
+                        parkId,
                         attractionId,
-                        () => analytics.GetWeekdayClosurePatternsAsync(
-                            parkId,
-                            attractionId,
-                            cancellationToken)))
+                        cancellationToken)))
             .WithName("GetWeekdayHourlyClosurePatterns")
             .WithSummary("Gets hourly closure frequency grouped by weekday")
             .CacheOutput("analytics");
-
-        return endpoints;
     }
 
     private static async Task<IResult> ExecuteWithAttractionValidation<T>(
