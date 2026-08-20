@@ -298,11 +298,11 @@ As the system,
 I want to store timestamped queue observations,  
 so that historical analysis and future predictions become possible.
 
-### [MVP REQUIRED] Story 2.3 — Track attraction availability
+### [DONE] [MVP REQUIRED] Story 2.3 — Track attraction availability
 
 As the system,  
-I want to know whether an attraction is operating, temporarily closed, or unavailable,  
-so that unavailable attractions are not recommended.
+I want to record whether an attraction is open during each queue observation and whether it remains active in the source catalog,  
+so that current operating and availability information is preserved for downstream use.
 
 ### Story 2.4 — Detect abnormal queue changes
 
@@ -494,9 +494,9 @@ so that the itinerary remains realistic.
 
 ### [MVP REQUIRED] Story 7.6 — Respect attraction availability
 
-As the visitor,  
-I want closed attractions excluded from recommendations,  
-so that I am never intentionally sent to an unavailable attraction.
+As a visitor,  
+I want the optimizer to use the latest recorded open and active statuses when generating recommendations,  
+so that I am never intentionally sent to a closed or unavailable attraction.
 
 ### Story 7.7 — Optimization scoring
 
