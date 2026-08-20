@@ -123,6 +123,58 @@ public sealed class InfrastructureTests
     }
 
     [Fact]
+    public void DisneyParksMigration_SeedsOnlyOrlandoParks()
+    {
+        var migrationPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Disney.Infrastructure",
+            "Migrations",
+            "004_seed_disney_parks.sql");
+        var migrationSql = File.ReadAllText(Path.GetFullPath(migrationPath));
+        var expectedSourceParkIds = new[] { 5, 6, 7, 8 };
+
+        foreach (var sourceParkId in expectedSourceParkIds)
+        {
+            Assert.Contains($"({sourceParkId},", migrationSql);
+        }
+
+        Assert.DoesNotContain("(4,", migrationSql);
+        Assert.DoesNotContain("(16,", migrationSql);
+        Assert.Contains("ON CONFLICT (source_park_id) DO UPDATE", migrationSql);
+        Assert.Contains("timezone = EXCLUDED.timezone", migrationSql);
+    }
+
+    [Fact]
+    public void NonOrlandoCleanupMigration_RemovesDependentDataBeforeParks()
+    {
+        var migrationPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Disney.Infrastructure",
+            "Migrations",
+            "005_remove_non_orlando_disney_parks.sql");
+        var migrationSql = File.ReadAllText(Path.GetFullPath(migrationPath));
+
+        var observationsDelete = migrationSql.IndexOf(
+            "DELETE FROM public.queue_observations",
+            StringComparison.Ordinal);
+        var parksDelete = migrationSql.IndexOf(
+            "DELETE FROM public.parks",
+            StringComparison.Ordinal);
+
+        Assert.True(observationsDelete >= 0);
+        Assert.True(parksDelete > observationsDelete);
+        Assert.Contains("source_park_id IN (4, 16, 17, 28, 30, 31, 274, 275)", migrationSql);
+    }
+
+    [Fact]
     public void AnalyticsReader_UsesWeekdayQuarterHourlyAggregates()
     {
         var analyticsReaderPath = Path.Combine(

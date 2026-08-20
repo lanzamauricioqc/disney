@@ -17,6 +17,8 @@ const EChart = lazy(() =>
 export function Dashboard() {
   const [selectedParkId, setSelectedParkId] = useState<number>()
   const [selectedAttractionId, setSelectedAttractionId] = useState<number>()
+  const [selectedLand, setSelectedLand] = useState('all')
+  const [attractionNameFilter, setAttractionNameFilter] = useState('')
 
   const parksQuery = useQuery({
     queryKey: ['parks'],
@@ -46,19 +48,45 @@ export function Dashboard() {
     [currentWaitsQuery.data],
   )
 
+  const landOptions = useMemo(() => {
+    const lands = new Map<string, string>()
+
+    attractions.forEach((attraction) => {
+      lands.set(getLandFilterValue(attraction), attraction.landName ?? 'Park-wide')
+    })
+
+    return [...lands.entries()].sort((left, right) =>
+      left[1].localeCompare(right[1]),
+    )
+  }, [attractions])
+
+  const filteredAttractions = useMemo(() => {
+    const normalizedNameFilter = attractionNameFilter.trim().toLocaleLowerCase()
+
+    return attractions.filter((attraction) => {
+      const matchesLand =
+        selectedLand === 'all' || getLandFilterValue(attraction) === selectedLand
+      const matchesName =
+        !normalizedNameFilter ||
+        attraction.attractionName.toLocaleLowerCase().includes(normalizedNameFilter)
+
+      return matchesLand && matchesName
+    })
+  }, [attractionNameFilter, attractions, selectedLand])
+
   useEffect(() => {
-    if (!attractions.length) {
+    if (!filteredAttractions.length) {
       setSelectedAttractionId(undefined)
       return
     }
 
-    const selectionExists = attractions.some(
+    const selectionExists = filteredAttractions.some(
       (attraction) => attraction.attractionId === selectedAttractionId,
     )
     if (!selectionExists) {
-      setSelectedAttractionId(attractions[0].attractionId)
+      setSelectedAttractionId(filteredAttractions[0].attractionId)
     }
-  }, [attractions, selectedAttractionId])
+  }, [filteredAttractions, selectedAttractionId])
 
   const historyQuery = useQuery({
     queryKey: ['daily-history', selectedParkId, selectedAttractionId],
@@ -124,6 +152,8 @@ export function Dashboard() {
               onChange={(event) => {
                 setSelectedParkId(Number(event.target.value))
                 setSelectedAttractionId(undefined)
+                setSelectedLand('all')
+                setAttractionNameFilter('')
               }}
             >
               {parksQuery.data?.map((park) => (
@@ -161,6 +191,33 @@ export function Dashboard() {
                 )}
               </div>
             </div>
+            <div className="queue-filters" aria-label="Filter attraction queues">
+              <label>
+                <span>Land</span>
+                <select
+                  aria-label="Filter attractions by land"
+                  value={selectedLand}
+                  onChange={(event) => setSelectedLand(event.target.value)}
+                >
+                  <option value="all">All lands</option>
+                  {landOptions.map(([value, name]) => (
+                    <option key={value} value={value}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Attraction name</span>
+                <input
+                  aria-label="Filter attractions by name"
+                  onChange={(event) => setAttractionNameFilter(event.target.value)}
+                  placeholder="Search attractions"
+                  type="search"
+                  value={attractionNameFilter}
+                />
+              </label>
+            </div>
             <div className="queue-column-labels" aria-hidden="true">
               <span>Attraction</span>
               <span>Wait</span>
@@ -175,8 +232,14 @@ export function Dashboard() {
               attractions.length === 0 && (
                 <InlineStatus message="No attraction observations are available yet." />
               )}
+            {!currentWaitsQuery.isLoading &&
+              !currentWaitsQuery.isError &&
+              attractions.length > 0 &&
+              filteredAttractions.length === 0 && (
+                <InlineStatus message="No attractions match the selected filters." />
+              )}
             <div className="queue-list">
-              {attractions.map((attraction) => (
+              {filteredAttractions.map((attraction) => (
                 <button
                   aria-pressed={attraction.attractionId === selectedAttractionId}
                   className={
@@ -413,4 +476,8 @@ function calculateAverageCurrentWait(attractions: CurrentWaitTime[]) {
   }
 
   return Math.round(waits.reduce((total, wait) => total + wait, 0) / waits.length)
+}
+
+function getLandFilterValue(attraction: CurrentWaitTime) {
+  return attraction.landId === null ? 'park-wide' : attraction.landId.toString()
 }
