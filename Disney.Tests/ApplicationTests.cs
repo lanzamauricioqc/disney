@@ -173,6 +173,53 @@ public sealed class ApplicationTests
     }
 
     [Fact]
+    public async Task AnalyticsService_QueriesHistoricalObservationsForRequestedWindow()
+    {
+        var from = new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
+        var to = from.AddDays(7);
+        var analyticsReader = new FakeQueueAnalyticsReader();
+        var service = new QueueAnalyticsService(
+            analyticsReader,
+            new FixedTimeProvider(DateTimeOffset.UtcNow));
+
+        var result = await service.GetHistoricalWaitTimesAsync(
+            1,
+            20,
+            from,
+            to,
+            CancellationToken.None);
+
+        Assert.Equal(from, result.FromInclusive);
+        Assert.Equal(to, result.ToExclusive);
+        Assert.Equal(from, analyticsReader.FromInclusive);
+        Assert.Equal(to, analyticsReader.ToExclusive);
+    }
+
+    [Fact]
+    public async Task AnalyticsService_RejectsInvalidHistoricalWindow()
+    {
+        var from = new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
+        var service = new QueueAnalyticsService(
+            new FakeQueueAnalyticsReader(),
+            new FixedTimeProvider(DateTimeOffset.UtcNow));
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.GetHistoricalWaitTimesAsync(
+                1,
+                20,
+                from,
+                from,
+                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.GetHistoricalWaitTimesAsync(
+                1,
+                20,
+                from,
+                from.AddDays(32),
+                CancellationToken.None));
+    }
+
+    [Fact]
     public async Task AnalyticsService_RejectsInvalidIdentifiers()
     {
         var service = new QueueAnalyticsService(
@@ -284,6 +331,8 @@ public sealed class ApplicationTests
     private sealed class FakeQueueAnalyticsReader : IQueueAnalyticsReader
     {
         public long? AttractionId { get; private set; }
+        public DateTimeOffset? FromInclusive { get; private set; }
+        public DateTimeOffset? ToExclusive { get; private set; }
 
         public Task<IReadOnlyList<CurrentWaitTime>> GetCurrentWaitTimesAsync(
             long parkId,
@@ -312,6 +361,20 @@ public sealed class ApplicationTests
         {
             AttractionId = attractionId;
             return Task.FromResult<IReadOnlyList<DailyWaitTimeHistory>>([]);
+        }
+
+        public Task<IReadOnlyList<HistoricalWaitTimeObservation>>
+            GetHistoricalWaitTimesAsync(
+                long parkId,
+                long attractionId,
+                DateTimeOffset fromInclusive,
+                DateTimeOffset toExclusive,
+                CancellationToken cancellationToken)
+        {
+            AttractionId = attractionId;
+            FromInclusive = fromInclusive;
+            ToExclusive = toExclusive;
+            return Task.FromResult<IReadOnlyList<HistoricalWaitTimeObservation>>([]);
         }
 
         public Task<IReadOnlyList<WeekdayClosurePattern>> GetWeekdayClosurePatternsAsync(

@@ -214,6 +214,9 @@ public sealed class InfrastructureTests
         Assert.Contains("observed_slot_minutes / 15", analyticsReaderSourceCode);
         Assert.Contains("AS LocalMinute", analyticsReaderSourceCode);
         Assert.Contains("observed_local_date AS LocalDate", analyticsReaderSourceCode);
+        Assert.Contains("observed_local_time AS LocalTime", analyticsReaderSourceCode);
+        Assert.Contains("observation.observed_at >= @FromInclusive", analyticsReaderSourceCode);
+        Assert.Contains("observation.observed_at < @ToExclusive", analyticsReaderSourceCode);
         Assert.Contains("ClosedPercentage", analyticsReaderSourceCode);
     }
 

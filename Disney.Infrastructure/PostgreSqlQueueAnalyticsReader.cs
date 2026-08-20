@@ -148,6 +148,46 @@ internal sealed class PostgreSqlQueueAnalyticsReader(
         return history.AsList();
     }
 
+    public async Task<IReadOnlyList<HistoricalWaitTimeObservation>>
+        GetHistoricalWaitTimesAsync(
+            long parkId,
+            long attractionId,
+            DateTimeOffset fromInclusive,
+            DateTimeOffset toExclusive,
+            CancellationToken cancellationToken)
+    {
+        await using var connection = connectionFactory.CreateConnection();
+        var observations =
+            await connection.QueryAsync<HistoricalWaitTimeObservation>(new CommandDefinition(
+            """
+            SELECT observation.attraction_id AS AttractionId,
+                   attraction.name AS AttractionName,
+                   observation.observed_at AS ObservedAt,
+                   observation.observed_local_date AS LocalDate,
+                   observation.observed_local_time AS LocalTime,
+                   observation.is_open AS IsOpen,
+                   observation.wait_minutes AS WaitMinutes
+            FROM public.queue_observations observation
+            JOIN public.attractions attraction
+              ON attraction.id = observation.attraction_id
+            WHERE observation.park_id = @ParkId
+              AND observation.attraction_id = @AttractionId
+              AND observation.is_valid
+              AND observation.observed_at >= @FromInclusive
+              AND observation.observed_at < @ToExclusive
+            ORDER BY observation.observed_at;
+            """,
+            new
+            {
+                ParkId = parkId,
+                AttractionId = attractionId,
+                FromInclusive = fromInclusive,
+                ToExclusive = toExclusive
+            },
+            cancellationToken: cancellationToken));
+        return observations.AsList();
+    }
+
     public async Task<IReadOnlyList<WeekdayClosurePattern>> GetWeekdayClosurePatternsAsync(
         long parkId,
         long? attractionId,

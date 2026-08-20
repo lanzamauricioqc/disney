@@ -5,6 +5,7 @@ public sealed class QueueAnalyticsService(
     TimeProvider timeProvider) : IQueueAnalyticsService
 {
     private const int LookbackMonths = 3;
+    public static readonly TimeSpan MaximumHistoricalQueryWindow = TimeSpan.FromDays(31);
 
     public async Task<CurrentWaitTimesResult> GetCurrentWaitTimesAsync(
         long parkId,
@@ -57,6 +58,29 @@ public sealed class QueueAnalyticsService(
             history);
     }
 
+    public async Task<HistoricalWaitTimesResult> GetHistoricalWaitTimesAsync(
+        long parkId,
+        long attractionId,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive,
+        CancellationToken cancellationToken)
+    {
+        Validate(parkId, attractionId);
+        ValidateHistoricalWindow(fromInclusive, toExclusive);
+        var observations = await reader.GetHistoricalWaitTimesAsync(
+            parkId,
+            attractionId,
+            fromInclusive,
+            toExclusive,
+            cancellationToken);
+        return new HistoricalWaitTimesResult(
+            parkId,
+            attractionId,
+            fromInclusive,
+            toExclusive,
+            observations);
+    }
+
     public async Task<WeekdayClosurePatternsResult> GetWeekdayClosurePatternsAsync(
         long parkId,
         long? attractionId,
@@ -97,6 +121,25 @@ public sealed class QueueAnalyticsService(
             throw new ArgumentOutOfRangeException(
                 nameof(parkId),
                 "Park id must be greater than zero.");
+        }
+    }
+
+    private static void ValidateHistoricalWindow(
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive)
+    {
+        if (fromInclusive >= toExclusive)
+        {
+            throw new ArgumentException(
+                "The historical query start must be before its end.",
+                nameof(fromInclusive));
+        }
+
+        if (toExclusive - fromInclusive > MaximumHistoricalQueryWindow)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(toExclusive),
+                $"Historical queries cannot exceed {MaximumHistoricalQueryWindow.TotalDays} days.");
         }
     }
 }

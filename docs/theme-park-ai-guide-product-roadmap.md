@@ -326,11 +326,11 @@ As the system,
 I want to maintain historical wait-time data,  
 so that queue trends can be analyzed.
 
-### [MVP REQUIRED] Story 3.2 — Query historical wait times
+### [DONE] [MVP REQUIRED] Story 3.2 — Query historical wait times
 
-As the optimization engine,  
-I want to retrieve historical queue data by attraction, date, and time,  
-so that itinerary decisions can consider typical queue behavior.
+As a park intelligence consumer,  
+I want to retrieve valid historical queue observations by attraction and timestamp range,  
+so that downstream services can analyze past queue conditions.
 
 ### [DONE] Story 3.3 — Historical aggregation
 
@@ -474,11 +474,11 @@ As a visitor,
 I want Must Do attractions heavily prioritized,  
 so that the plan minimizes the risk of missing them.
 
-### [MVP REQUIRED] Story 7.3 — Consider current queue times
+### [MVP REQUIRED] Story 7.3 — Consider current and historical queue times
 
 As the optimization engine,  
-I want current wait times included in itinerary calculations,  
-so that the itinerary reflects live conditions.
+I want current waits and relevant historical queue patterns included in itinerary calculations,  
+so that the itinerary reflects live conditions and typical queue behavior.
 
 ### [MVP REQUIRED] Story 7.4 — Consider walking time
 

@@ -16,15 +16,19 @@ The API depends on `Disney.Application` contracts rather than querying PostgreSQ
 
 ## API
 
-All analytics use the trailing three months:
+Dashboard aggregation endpoints use the trailing three months:
 
 ```text
 GET /api/v1/parks/{parkId}/wait-times/current
 GET /api/v1/parks
+GET /api/v1/parks/{parkId}/analytics/wait-times/history?attractionId={attractionId}&from={timestamp}&to={timestamp}
 GET /api/v1/parks/{parkId}/analytics/wait-times/daily?attractionId={attractionId}
 GET /api/v1/parks/{parkId}/analytics/wait-times/weekday-quarter-hourly
 GET /api/v1/parks/{parkId}/analytics/closures/weekday-quarter-hourly
 ```
+
+Historical observation queries use an inclusive `from`, exclusive `to`, and a maximum
+31-day range. Timestamps must include an offset.
 
 The analytics endpoints group local park time into 15-minute buckets and return
 `localHour` and `localMinute`. They accept an optional `attractionId` query parameter.

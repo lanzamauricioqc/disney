@@ -13,6 +13,7 @@ internal static class QueueAnalyticsEndpoints
 
         MapCurrentWaitTimesEndpoint(parkEndpoints);
         MapDailyWaitTimeHistoryEndpoint(parkEndpoints);
+        MapHistoricalWaitTimesEndpoint(parkEndpoints);
         MapQuarterHourlyWaitTimePatternsEndpoint(parkEndpoints);
         MapQuarterHourlyClosurePatternsEndpoint(parkEndpoints);
         return endpoints;
@@ -35,6 +36,32 @@ internal static class QueueAnalyticsEndpoints
                         cancellationToken)))
             .WithName("GetDailyWaitTimeHistory")
             .WithSummary("Gets daily wait-time history for an attraction")
+            .CacheOutput("analytics");
+    }
+
+    private static void MapHistoricalWaitTimesEndpoint(RouteGroupBuilder parkEndpoints)
+    {
+        parkEndpoints.MapGet(
+            "/analytics/wait-times/history",
+            async (
+                long parkId,
+                long attractionId,
+                DateTimeOffset from,
+                DateTimeOffset to,
+                IQueueAnalyticsService analyticsService,
+                CancellationToken cancellationToken) =>
+                await ExecuteHistoricalWaitTimesQuery(
+                    attractionId,
+                    from,
+                    to,
+                    () => analyticsService.GetHistoricalWaitTimesAsync(
+                        parkId,
+                        attractionId,
+                        from,
+                        to,
+                        cancellationToken)))
+            .WithName("GetHistoricalWaitTimes")
+            .WithSummary("Gets historical wait-time observations for an attraction and time range")
             .CacheOutput("analytics");
     }
 
@@ -106,6 +133,40 @@ internal static class QueueAnalyticsEndpoints
             {
                 ["attractionId"] = ["Attraction id must be greater than zero."]
             });
+        }
+
+        return Results.Ok(await execute());
+    }
+
+    private static async Task<IResult> ExecuteHistoricalWaitTimesQuery<T>(
+        long attractionId,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        Func<Task<T>> execute)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        if (attractionId <= 0)
+        {
+            errors["attractionId"] = ["Attraction id must be greater than zero."];
+        }
+
+        if (from >= to)
+        {
+            errors["from"] = ["The start must be before the end."];
+        }
+        else if (to - from > QueueAnalyticsService.MaximumHistoricalQueryWindow)
+        {
+            errors["to"] =
+            [
+                $"The query range cannot exceed " +
+                $"{QueueAnalyticsService.MaximumHistoricalQueryWindow.TotalDays} days."
+            ];
+        }
+
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
         }
 
         return Results.Ok(await execute());
