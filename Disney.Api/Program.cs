@@ -13,7 +13,7 @@ builder.Services.AddOutputCache(options =>
 {
     options.AddPolicy("parks", policy => policy.Expire(TimeSpan.FromMinutes(30)));
     options.AddPolicy("current-waits", policy => policy.Expire(TimeSpan.FromSeconds(30)));
-    options.AddPolicy("analytics", policy => policy.Expire(TimeSpan.FromMinutes(10)));
+    options.AddPolicy("analytics", policy => policy.Expire(TimeSpan.FromMinutes(4)));
 });
 builder.Services.AddRateLimiter(options =>
 {
