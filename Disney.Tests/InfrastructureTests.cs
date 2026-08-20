@@ -175,6 +175,27 @@ public sealed class InfrastructureTests
     }
 
     [Fact]
+    public void AdminOperationsMigration_AddsSchedulingAndObservationAuditFields()
+    {
+        var migrationPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Disney.Infrastructure",
+            "Migrations",
+            "006_add_admin_operations.sql");
+        var migrationSql = File.ReadAllText(Path.GetFullPath(migrationPath));
+
+        Assert.Contains("collection_enabled boolean", migrationSql);
+        Assert.Contains("collection_interval_minutes integer", migrationSql);
+        Assert.Contains("trigger_source text", migrationSql);
+        Assert.Contains("is_valid boolean", migrationSql);
+        Assert.Contains("invalid_reason text", migrationSql);
+    }
+
+    [Fact]
     public void AnalyticsReader_UsesWeekdayQuarterHourlyAggregates()
     {
         var analyticsReaderPath = Path.Combine(

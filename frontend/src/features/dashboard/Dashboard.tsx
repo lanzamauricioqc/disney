@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import {
   getCurrentWaitTimes,
   getDailyWaitTimeHistory,
@@ -129,9 +130,14 @@ export function Dashboard() {
             <small>Park operations</small>
           </span>
         </a>
-        <div className="topbar-status">
-          <span className="status-dot" aria-hidden="true" />
-          Data service online
+        <div className="topbar-actions">
+          <Link className="topbar-link" to="/admin">
+            Administration
+          </Link>
+          <div className="topbar-status">
+            <span className="status-dot" aria-hidden="true" />
+            Data service online
+          </div>
         </div>
       </header>
 

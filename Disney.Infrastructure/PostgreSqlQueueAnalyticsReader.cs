@@ -30,6 +30,7 @@ internal sealed class PostgreSqlQueueAnalyticsReader(
               ON land.id = observation.land_id
             WHERE observation.park_id = @ParkId
               AND attraction.is_active
+              AND observation.is_valid
               AND observation.observed_at >= @WindowStart
               AND observation.observed_at <= @WindowEnd
             ORDER BY observation.attraction_id, observation.observed_at DESC;
@@ -67,6 +68,7 @@ internal sealed class PostgreSqlQueueAnalyticsReader(
                   ON attraction.id = observation.attraction_id
                 WHERE observation.park_id = @ParkId
                   AND attraction.is_active
+                  AND observation.is_valid
                   AND observation.observed_at >= @WindowStart
                   AND observation.observed_at <= @WindowEnd
                   AND observation.is_open
@@ -126,6 +128,7 @@ internal sealed class PostgreSqlQueueAnalyticsReader(
               ON attraction.id = observation.attraction_id
             WHERE observation.park_id = @ParkId
               AND observation.attraction_id = @AttractionId
+              AND observation.is_valid
               AND observation.observed_at >= @WindowStart
               AND observation.observed_at <= @WindowEnd
               AND observation.is_open
@@ -168,6 +171,7 @@ internal sealed class PostgreSqlQueueAnalyticsReader(
                   ON attraction.id = observation.attraction_id
                 WHERE observation.park_id = @ParkId
                   AND attraction.is_active
+                  AND observation.is_valid
                   AND observation.observed_at >= @WindowStart
                   AND observation.observed_at <= @WindowEnd
                   AND (@AttractionId IS NULL

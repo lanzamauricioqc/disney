@@ -11,9 +11,15 @@ builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddOutputCache(options =>
 {
-    options.AddPolicy("parks", policy => policy.Expire(TimeSpan.FromMinutes(30)));
-    options.AddPolicy("current-waits", policy => policy.Expire(TimeSpan.FromSeconds(30)));
-    options.AddPolicy("analytics", policy => policy.Expire(TimeSpan.FromMinutes(4)));
+    options.AddPolicy(
+        "parks",
+        policy => policy.Expire(TimeSpan.FromMinutes(30)).Tag("parks"));
+    options.AddPolicy(
+        "current-waits",
+        policy => policy.Expire(TimeSpan.FromSeconds(30)).Tag("current-waits"));
+    options.AddPolicy(
+        "analytics",
+        policy => policy.Expire(TimeSpan.FromMinutes(4)).Tag("analytics"));
 });
 builder.Services.AddRateLimiter(options =>
 {
@@ -46,6 +52,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddDisneyInfrastructure(builder.Configuration);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IQueueAnalyticsService, QueueAnalyticsService>();
+builder.Services.AddScoped<IQueueCollectionService, QueueCollectionService>();
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
@@ -74,6 +81,7 @@ application.MapHealthChecks("/health/ready", new HealthCheckOptions
 });
 application.MapParkEndpoints();
 application.MapQueueAnalyticsEndpoints();
+application.MapAdminEndpoints();
 
 await application.Services.GetRequiredService<IDatabaseMigrator>().MigrateAsync();
 application.Run();

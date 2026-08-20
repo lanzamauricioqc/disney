@@ -15,9 +15,21 @@ public sealed class QueueCollectionJob(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (!park.CollectionEnabled)
+            {
+                continue;
+            }
+
             if (park.SourceParkId <= 0)
             {
                 logger.LogWarning("Park {ParkId} ({ParkName}) has no valid source id.", park.Id, park.Name);
+                continue;
+            }
+
+            if (park.LastCollectionStartedAt is not null &&
+                park.LastCollectionStartedAt.Value.AddMinutes(
+                    park.CollectionIntervalMinutes) > DateTimeOffset.UtcNow)
+            {
                 continue;
             }
 

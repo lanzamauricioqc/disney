@@ -115,6 +115,29 @@ public sealed class ApplicationTests
     }
 
     [Fact]
+    public async Task CollectionJob_RespectsParkCollectionControls()
+    {
+        var collectionService = new FakeQueueCollectionService();
+        var collectionJob = new QueueCollectionJob(
+            new StubParkReader(
+                CreatePark(1, collectionEnabled: false),
+                CreatePark(
+                    2,
+                    lastCollectionStartedAt: DateTimeOffset.UtcNow,
+                    collectionIntervalMinutes: 5),
+                CreatePark(
+                    3,
+                    lastCollectionStartedAt: DateTimeOffset.UtcNow.AddMinutes(-6),
+                    collectionIntervalMinutes: 5)),
+            collectionService,
+            NullLogger<QueueCollectionJob>.Instance);
+
+        await collectionJob.ExecuteAsync(CancellationToken.None);
+
+        Assert.Equal([3L], collectionService.ParkIds);
+    }
+
+    [Fact]
     public async Task AnalyticsService_UsesTrailingThreeMonthWindow()
     {
         var currentTime = new DateTimeOffset(2026, 8, 18, 22, 0, 0, TimeSpan.Zero);
@@ -165,13 +188,21 @@ public sealed class ApplicationTests
                 CancellationToken.None));
     }
 
-    private static Park CreatePark(long id = 1, int sourceId = 6) =>
+    private static Park CreatePark(
+        long id = 1,
+        int sourceId = 6,
+        bool collectionEnabled = true,
+        int collectionIntervalMinutes = 5,
+        DateTimeOffset? lastCollectionStartedAt = null) =>
         new()
         {
             Id = id,
             SourceParkId = sourceId,
             Name = $"Park {id}",
-            Timezone = "America/New_York"
+            Timezone = "America/New_York",
+            CollectionEnabled = collectionEnabled,
+            CollectionIntervalMinutes = collectionIntervalMinutes,
+            LastCollectionStartedAt = lastCollectionStartedAt
         };
 
     private static QueueTimesSnapshot CreateSnapshot() =>
