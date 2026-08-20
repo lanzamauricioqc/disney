@@ -258,11 +258,11 @@ As a visitor,
 I want to see the attractions available in a selected park,  
 so that I can choose which attractions matter to me.
 
-### [MVP REQUIRED] Story 1.3 — Store attraction metadata
+### [DONE] [MVP REQUIRED] Story 1.3 — Store attraction metadata
 
 As the system,  
-I need attraction metadata such as name, location, approximate duration, and operating status,  
-so that itinerary calculations can use reliable attraction information.
+I need to store each attraction's name, current land, active status, and optional duration and coordinates,  
+so that attraction information can be collected automatically and enriched through administration.
 
 ### Story 1.4 — Store attraction restrictions
 
