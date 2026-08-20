@@ -246,13 +246,13 @@ The system must have a reliable internal representation of parks and attractions
 
 ## User Stories
 
-### [MVP REQUIRED] Story 1.1 — View available parks
+### [DONE] [MVP REQUIRED] Story 1.1 — View available parks
 
 As a visitor,  
 I want to see the parks supported by the platform,  
 so that I can select the park I intend to visit.
 
-### [MVP REQUIRED] Story 1.2 — View park attractions
+### [DONE] [MVP REQUIRED] Story 1.2 — View park attractions
 
 As a visitor,  
 I want to see the attractions available in a selected park,  
@@ -286,13 +286,13 @@ The system must continuously collect current attraction wait times and operation
 
 ## User Stories
 
-### [MVP REQUIRED] Story 2.1 — Collect current wait times
+### [DONE] [MVP REQUIRED] Story 2.1 — Collect current wait times
 
 As the system,  
 I want to periodically collect attraction wait times,  
 so that recommendations can use current park conditions.
 
-### [MVP REQUIRED] Story 2.2 — Persist queue observations
+### [DONE] [MVP REQUIRED] Story 2.2 — Persist queue observations
 
 As the system,  
 I want to store timestamped queue observations,  
@@ -320,7 +320,7 @@ Historical observations provide the foundation for understanding queue behavior.
 
 ## User Stories
 
-### [MVP REQUIRED] Story 3.1 — Store historical wait-time observations
+### [DONE] [MVP REQUIRED] Story 3.1 — Store historical wait-time observations
 
 As the system,  
 I want to maintain historical wait-time data,  
@@ -332,7 +332,7 @@ As the optimization engine,
 I want to retrieve historical queue data by attraction, date, and time,  
 so that itinerary decisions can consider typical queue behavior.
 
-### Story 3.3 — Historical aggregation
+### [DONE] Story 3.3 — Historical aggregation
 
 As the system,  
 I want historical observations aggregated by useful dimensions such as weekday and hour,  
@@ -634,7 +634,7 @@ The product will primarily be used while walking through a park.
 
 ## User Stories
 
-### [MVP REQUIRED] Story 11.1 — Mobile-responsive interface
+### [DONE] [MVP REQUIRED] Story 11.1 — Mobile-responsive interface
 
 As a visitor,  
 I want the application to work well on a mobile phone,  
@@ -1286,7 +1286,7 @@ These features are useful for analysis but should not compete with core visitor 
 
 ## User Stories
 
-### Story 30.1 — Historical queue charts
+### [DONE] Story 30.1 — Historical queue charts
 
 As a user,  
 I want to see historical queue patterns,  
