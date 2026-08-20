@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/Solution Items/">
     <File Path="docker-compose.yml" />
+    <File Path="docs/theme-park-ai-guide-product-roadmap.md" />
     <File Path="NuGet.Config" />
   </Folder>
   <Project Path="Disney.Api/Disney.Api.csproj" />
