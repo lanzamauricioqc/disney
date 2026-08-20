@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Park Pilot, a static mobile prototype for real-time theme park itinerary guidance."
+    />
+    <title>Park Pilot Prototype</title>
+    <link rel="icon" href="data:," />
+    <script>
+      // Apply the saved theme before first paint so night users never see a
+      // bright flash. Sunlight (day) is the default for new visitors.
+      (function () {
+        try {
+          var saved = localStorage.getItem("park-pilot-theme");
+          document.documentElement.setAttribute(
+            "data-theme",
+            saved === "night" ? "night" : "day"
+          );
+        } catch (error) {
+          document.documentElement.setAttribute("data-theme", "day");
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#app-main">Skip to content</a>
+    <div class="prototype-stage">
+      <div class="phone-shell">
+        <div class="brand-beam" aria-hidden="true"></div>
+        <div id="app" class="app" aria-live="polite"></div>
+      </div>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
