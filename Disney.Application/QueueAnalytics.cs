@@ -32,6 +32,14 @@ public sealed record DailyWaitTimeHistory(
     short MaximumWaitMinutes,
     int ObservationCount);
 
+public sealed record DailyParkWaitTime(
+    long ParkId,
+    string ParkName,
+    DateOnly LocalDate,
+    decimal AverageWaitMinutes,
+    int AttractionCount,
+    int ObservationCount);
+
 public sealed record HistoricalWaitTimeObservation(
     long AttractionId,
     string AttractionName,
@@ -70,6 +78,14 @@ public sealed record DailyWaitTimeHistoryResult(
     DateTimeOffset WindowEnd,
     IReadOnlyList<DailyWaitTimeHistory> History);
 
+public sealed record DailyParkWaitTimesResult(
+    DateOnly WeekStart,
+    DateOnly WeekEnd,
+    DateOnly AvailableFrom,
+    DateOnly CurrentWeekStart,
+    DateTimeOffset GeneratedAt,
+    IReadOnlyList<DailyParkWaitTime> Parks);
+
 public sealed record HistoricalWaitTimesResult(
     long ParkId,
     long AttractionId,
@@ -105,6 +121,11 @@ public interface IQueueAnalyticsReader
         DateTimeOffset windowEnd,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<DailyParkWaitTime>> GetDailyParkWaitTimesAsync(
+        DateOnly fromInclusive,
+        DateOnly toExclusive,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<HistoricalWaitTimeObservation>> GetHistoricalWaitTimesAsync(
         long parkId,
         long attractionId,
@@ -134,6 +155,10 @@ public interface IQueueAnalyticsService
     Task<DailyWaitTimeHistoryResult> GetDailyWaitTimeHistoryAsync(
         long parkId,
         long attractionId,
+        CancellationToken cancellationToken);
+
+    Task<DailyParkWaitTimesResult> GetDailyParkWaitTimesAsync(
+        DateOnly? weekStart,
         CancellationToken cancellationToken);
 
     Task<HistoricalWaitTimesResult> GetHistoricalWaitTimesAsync(

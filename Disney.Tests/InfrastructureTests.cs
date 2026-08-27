@@ -218,6 +218,10 @@ public sealed class InfrastructureTests
         Assert.Contains("observation.observed_at >= @FromInclusive", analyticsReaderSourceCode);
         Assert.Contains("observation.observed_at < @ToExclusive", analyticsReaderSourceCode);
         Assert.Contains("ClosedPercentage", analyticsReaderSourceCode);
+        Assert.Contains("attraction_daily_waits", analyticsReaderSourceCode);
+        Assert.Contains("AVG(daily.attraction_average_wait)", analyticsReaderSourceCode);
+        Assert.Contains("observation.observed_local_date >= @FromInclusive", analyticsReaderSourceCode);
+        Assert.Contains("WHERE park.is_active", analyticsReaderSourceCode);
     }
 
     private sealed class StubHandler(HttpStatusCode statusCode, string content)

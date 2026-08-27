@@ -5,6 +5,7 @@ import type {
   AdminObservation,
   AdminPark,
   CurrentWaitTimesResult,
+  DailyParkWaitTimesResult,
   DailyWaitTimeHistoryResult,
   Park,
   SaveAdminAttraction,
@@ -81,6 +82,21 @@ export function getDailyWaitTimeHistory(
   const query = new URLSearchParams({ attractionId: attractionId.toString() })
   return getJson<DailyWaitTimeHistoryResult>(
     `/api/v1/parks/${parkId}/analytics/wait-times/daily?${query}`,
+    signal,
+  )
+}
+
+export function getDailyParkWaitTimes(
+  weekStart?: string,
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams()
+  if (weekStart) {
+    query.set('weekStart', weekStart)
+  }
+  const queryString = query.size ? `?${query}` : ''
+  return getJson<DailyParkWaitTimesResult>(
+    `/api/v1/analytics/parks/daily${queryString}`,
     signal,
   )
 }

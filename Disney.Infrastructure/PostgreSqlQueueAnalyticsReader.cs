@@ -148,6 +148,52 @@ internal sealed class PostgreSqlQueueAnalyticsReader(
         return history.AsList();
     }
 
+    public async Task<IReadOnlyList<DailyParkWaitTime>> GetDailyParkWaitTimesAsync(
+        DateOnly fromInclusive,
+        DateOnly toExclusive,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = connectionFactory.CreateConnection();
+        var dailyWaitTimes =
+            await connection.QueryAsync<DailyParkWaitTime>(new CommandDefinition(
+            """
+            WITH attraction_daily_waits AS (
+                SELECT observation.park_id,
+                       observation.attraction_id,
+                       observation.observed_local_date,
+                       AVG(observation.wait_minutes) AS attraction_average_wait,
+                       COUNT(*)::int AS observation_count
+                FROM public.queue_observations observation
+                WHERE observation.observed_local_date >= @FromInclusive
+                  AND observation.observed_local_date < @ToExclusive
+                  AND observation.is_valid
+                  AND observation.is_open
+                  AND observation.wait_minutes IS NOT NULL
+                GROUP BY observation.park_id, observation.attraction_id,
+                         observation.observed_local_date
+            )
+            SELECT daily.park_id AS ParkId,
+                   park.name AS ParkName,
+                   daily.observed_local_date AS LocalDate,
+                   ROUND(AVG(daily.attraction_average_wait), 2) AS AverageWaitMinutes,
+                   COUNT(*)::int AS AttractionCount,
+                   SUM(daily.observation_count)::int AS ObservationCount
+            FROM attraction_daily_waits daily
+            JOIN public.parks park
+              ON park.id = daily.park_id
+            WHERE park.is_active
+            GROUP BY daily.park_id, park.name, daily.observed_local_date
+            ORDER BY daily.observed_local_date, park.name;
+            """,
+            new
+            {
+                FromInclusive = fromInclusive,
+                ToExclusive = toExclusive
+            },
+            cancellationToken: cancellationToken));
+        return dailyWaitTimes.AsList();
+    }
+
     public async Task<IReadOnlyList<HistoricalWaitTimeObservation>>
         GetHistoricalWaitTimesAsync(
             long parkId,

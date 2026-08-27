@@ -276,6 +276,63 @@ input:hover {
   align-items: start;
 }
 
+.weekly-park-panel {
+  min-height: 465px;
+  margin-bottom: 18px;
+}
+
+.weekly-park-heading {
+  align-items: flex-start;
+}
+
+.metric-description {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 0.73rem;
+}
+
+.week-navigation {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.week-navigation > span {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.week-navigation > div {
+  display: flex;
+  gap: 6px;
+}
+
+.week-navigation button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.week-navigation button:hover:not(:disabled) {
+  color: var(--brand);
+  border-color: var(--brand);
+}
+
+.week-navigation button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .surface {
   overflow: hidden;
   border: 1px solid var(--border);
@@ -1238,6 +1295,19 @@ input:hover {
     min-height: 76px;
     align-items: flex-start;
     padding: 16px;
+  }
+
+  .weekly-park-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .week-navigation {
+    justify-content: space-between;
+  }
+
+  .week-navigation > span {
+    font-size: 0.7rem;
   }
 
   .panel-detail,

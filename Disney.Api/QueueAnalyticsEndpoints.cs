@@ -16,7 +16,26 @@ internal static class QueueAnalyticsEndpoints
         MapHistoricalWaitTimesEndpoint(parkEndpoints);
         MapQuarterHourlyWaitTimePatternsEndpoint(parkEndpoints);
         MapQuarterHourlyClosurePatternsEndpoint(parkEndpoints);
+        MapDailyParkWaitTimesEndpoint(endpoints);
         return endpoints;
+    }
+
+    private static void MapDailyParkWaitTimesEndpoint(IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapGet(
+            "/api/v1/analytics/parks/daily",
+            async (
+                DateOnly? weekStart,
+                IQueueAnalyticsService analyticsService,
+                CancellationToken cancellationToken) =>
+                await ExecuteDailyParkWaitTimesQuery(
+                    () => analyticsService.GetDailyParkWaitTimesAsync(
+                        weekStart,
+                        cancellationToken)))
+            .WithName("GetDailyParkWaitTimes")
+            .WithSummary("Compares daily average wait times across parks for one week")
+            .WithTags("Queue analytics")
+            .CacheOutput("analytics");
     }
 
     private static void MapDailyWaitTimeHistoryEndpoint(RouteGroupBuilder parkEndpoints)
@@ -170,5 +189,21 @@ internal static class QueueAnalyticsEndpoints
         }
 
         return Results.Ok(await execute());
+    }
+
+    private static async Task<IResult> ExecuteDailyParkWaitTimesQuery<T>(
+        Func<Task<T>> execute)
+    {
+        try
+        {
+            return Results.Ok(await execute());
+        }
+        catch (ArgumentException exception)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["weekStart"] = [exception.Message]
+            });
+        }
     }
 }

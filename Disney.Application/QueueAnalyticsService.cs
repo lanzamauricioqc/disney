@@ -5,6 +5,9 @@ public sealed class QueueAnalyticsService(
     TimeProvider timeProvider) : IQueueAnalyticsService
 {
     private const int LookbackMonths = 3;
+    private const int DaysInWeek = 7;
+    private static readonly TimeZoneInfo ParkTimeZone =
+        TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
     public static readonly TimeSpan MaximumHistoricalQueryWindow = TimeSpan.FromDays(31);
 
     public async Task<CurrentWaitTimesResult> GetCurrentWaitTimesAsync(
@@ -56,6 +59,37 @@ public sealed class QueueAnalyticsService(
             window.From,
             window.To,
             history);
+    }
+
+    public async Task<DailyParkWaitTimesResult> GetDailyParkWaitTimesAsync(
+        DateOnly? weekStart,
+        CancellationToken cancellationToken)
+    {
+        var generatedAt = timeProvider.GetUtcNow();
+        var currentDate = DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTime(generatedAt, ParkTimeZone).DateTime);
+        var currentWeekStart = StartOfWeek(currentDate);
+        var selectedWeekStart = weekStart ?? currentWeekStart;
+        var availableFrom = currentDate.AddMonths(-LookbackMonths);
+
+        ValidateWeek(selectedWeekStart, availableFrom, currentWeekStart);
+
+        var queryStart = selectedWeekStart < availableFrom
+            ? availableFrom
+            : selectedWeekStart;
+        var weekEnd = selectedWeekStart.AddDays(DaysInWeek - 1);
+        var parks = await reader.GetDailyParkWaitTimesAsync(
+            queryStart,
+            weekEnd.AddDays(1),
+            cancellationToken);
+
+        return new DailyParkWaitTimesResult(
+            selectedWeekStart,
+            weekEnd,
+            availableFrom,
+            currentWeekStart,
+            generatedAt,
+            parks);
     }
 
     public async Task<HistoricalWaitTimesResult> GetHistoricalWaitTimesAsync(
@@ -142,4 +176,34 @@ public sealed class QueueAnalyticsService(
                 $"Historical queries cannot exceed {MaximumHistoricalQueryWindow.TotalDays} days.");
         }
     }
+
+    private static void ValidateWeek(
+        DateOnly weekStart,
+        DateOnly availableFrom,
+        DateOnly currentWeekStart)
+    {
+        if (weekStart.DayOfWeek != DayOfWeek.Monday)
+        {
+            throw new ArgumentException(
+                "The selected week must start on a Monday.",
+                nameof(weekStart));
+        }
+
+        if (weekStart > currentWeekStart)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(weekStart),
+                "The selected week cannot be in the future.");
+        }
+
+        if (weekStart.AddDays(DaysInWeek - 1) < availableFrom)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(weekStart),
+                "The selected week is outside the three-month history window.");
+        }
+    }
+
+    private static DateOnly StartOfWeek(DateOnly date) =>
+        date.AddDays(-((7 + (int)date.DayOfWeek - (int)DayOfWeek.Monday) % 7));
 }

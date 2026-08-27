@@ -39,6 +39,24 @@ export interface DailyWaitTimeHistoryResult {
   history: DailyWaitTime[]
 }
 
+export interface DailyParkWaitTime {
+  parkId: number
+  parkName: string
+  localDate: string
+  averageWaitMinutes: number
+  attractionCount: number
+  observationCount: number
+}
+
+export interface DailyParkWaitTimesResult {
+  weekStart: string
+  weekEnd: string
+  availableFrom: string
+  currentWeekStart: string
+  generatedAt: string
+  parks: DailyParkWaitTime[]
+}
+
 export interface WeekdayWaitTimePattern {
   attractionId: number
   attractionName: string

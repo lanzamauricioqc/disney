@@ -3,12 +3,17 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import {
   getCurrentWaitTimes,
+  getDailyParkWaitTimes,
   getDailyWaitTimeHistory,
   getParks,
   getWeekdayWaitTimePatterns,
 } from '../../api/client'
 import type { CurrentWaitTime } from '../../api/contracts'
-import { createHistoryChartOption, createPatternChartOption } from './chartOptions'
+import {
+  createDailyParkChartOption,
+  createHistoryChartOption,
+  createPatternChartOption,
+} from './chartOptions'
 import { formatObservedAt, formatWindow } from './formatters'
 
 const EChart = lazy(() =>
@@ -20,6 +25,7 @@ export function Dashboard() {
   const [selectedAttractionId, setSelectedAttractionId] = useState<number>()
   const [selectedLand, setSelectedLand] = useState('all')
   const [attractionNameFilter, setAttractionNameFilter] = useState('')
+  const [selectedWeekStart, setSelectedWeekStart] = useState<string>()
 
   const parksQuery = useQuery({
     queryKey: ['parks'],
@@ -105,6 +111,12 @@ export function Dashboard() {
     staleTime: 10 * 60_000,
   })
 
+  const dailyParksQuery = useQuery({
+    queryKey: ['daily-park-waits', selectedWeekStart],
+    queryFn: ({ signal }) => getDailyParkWaitTimes(selectedWeekStart, signal),
+    staleTime: 10 * 60_000,
+  })
+
   const selectedPark = parksQuery.data?.find((park) => park.id === selectedParkId)
   const selectedAttraction = attractions.find(
     (attraction) => attraction.attractionId === selectedAttractionId,
@@ -180,6 +192,40 @@ export function Dashboard() {
           />
           <Metric label="Park timezone" value={selectedPark?.timezone ?? '--'} compact />
         </section>
+
+        <article className="surface chart-panel weekly-park-panel">
+          <div className="panel-heading weekly-park-heading">
+            <div>
+              <p className="eyebrow">Daily park comparison</p>
+              <h2>Average wait across each park</h2>
+              <p className="metric-description">
+                Each attraction contributes one daily average, regardless of sample count.
+              </p>
+            </div>
+            <WeekNavigation
+              data={dailyParksQuery.data}
+              disabled={dailyParksQuery.isFetching}
+              onChange={setSelectedWeekStart}
+            />
+          </div>
+          <ChartContent
+            loading={dailyParksQuery.isLoading}
+            error={dailyParksQuery.isError}
+            empty={!dailyParksQuery.data?.parks.length}
+          >
+            {dailyParksQuery.data && (
+              <Suspense fallback={<InlineStatus message="Preparing chart..." />}>
+                <EChart
+                  ariaLabel={`Daily average park wait times from ${dailyParksQuery.data.weekStart} through ${dailyParksQuery.data.weekEnd}`}
+                  option={createDailyParkChartOption(
+                    dailyParksQuery.data.weekStart,
+                    dailyParksQuery.data.parks,
+                  )}
+                />
+              </Suspense>
+            )}
+          </ChartContent>
+        </article>
 
         <section className="dashboard-grid">
           <article className="surface queue-panel">
@@ -327,6 +373,50 @@ export function Dashboard() {
           </div>
         </section>
       </main>
+    </div>
+  )
+}
+
+function WeekNavigation({
+  data,
+  disabled,
+  onChange,
+}: {
+  data: Awaited<ReturnType<typeof getDailyParkWaitTimes>> | undefined
+  disabled: boolean
+  onChange: (weekStart: string) => void
+}) {
+  if (!data) {
+    return <span className="panel-detail">Current week</span>
+  }
+
+  const previousWeekStart = addDays(data.weekStart, -7)
+  const nextWeekStart = addDays(data.weekStart, 7)
+  const previousWeekEnd = addDays(previousWeekStart, 6)
+  const canGoBack = previousWeekEnd >= data.availableFrom
+  const canGoForward = nextWeekStart <= data.currentWeekStart
+
+  return (
+    <div className="week-navigation" aria-label="Select comparison week">
+      <span>{formatWeekRange(data.weekStart, data.weekEnd)}</span>
+      <div>
+        <button
+          aria-label="View previous week"
+          disabled={disabled || !canGoBack}
+          onClick={() => onChange(previousWeekStart)}
+          type="button"
+        >
+          ‹
+        </button>
+        <button
+          aria-label="View next week"
+          disabled={disabled || !canGoForward}
+          onClick={() => onChange(nextWeekStart)}
+          type="button"
+        >
+          ›
+        </button>
+      </div>
     </div>
   )
 }
@@ -486,4 +576,22 @@ function calculateAverageCurrentWait(attractions: CurrentWaitTime[]) {
 
 function getLandFilterValue(attraction: CurrentWaitTime) {
   return attraction.landId === null ? 'park-wide' : attraction.landId.toString()
+}
+
+function addDays(date: string, days: number) {
+  const parsedDate = new Date(`${date}T12:00:00Z`)
+  parsedDate.setUTCDate(parsedDate.getUTCDate() + days)
+  return parsedDate.toISOString().slice(0, 10)
+}
+
+function formatWeekRange(weekStart: string, weekEnd: string) {
+  const formatter = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+  return `${formatter.format(new Date(`${weekStart}T12:00:00Z`))} – ${formatter.format(
+    new Date(`${weekEnd}T12:00:00Z`),
+  )}`
 }

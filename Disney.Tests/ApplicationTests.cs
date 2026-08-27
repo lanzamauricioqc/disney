@@ -196,6 +196,50 @@ public sealed class ApplicationTests
     }
 
     [Fact]
+    public async Task AnalyticsService_QueriesSelectedParkComparisonWeek()
+    {
+        var currentTime = new DateTimeOffset(2026, 8, 26, 13, 0, 0, TimeSpan.Zero);
+        var analyticsReader = new FakeQueueAnalyticsReader();
+        var service = new QueueAnalyticsService(
+            analyticsReader,
+            new FixedTimeProvider(currentTime));
+        var weekStart = new DateOnly(2026, 8, 17);
+
+        var result = await service.GetDailyParkWaitTimesAsync(
+            weekStart,
+            CancellationToken.None);
+
+        Assert.Equal(weekStart, result.WeekStart);
+        Assert.Equal(new DateOnly(2026, 8, 23), result.WeekEnd);
+        Assert.Equal(new DateOnly(2026, 5, 26), result.AvailableFrom);
+        Assert.Equal(new DateOnly(2026, 8, 24), result.CurrentWeekStart);
+        Assert.Equal(weekStart, analyticsReader.DailyParksFromInclusive);
+        Assert.Equal(new DateOnly(2026, 8, 24), analyticsReader.DailyParksToExclusive);
+    }
+
+    [Fact]
+    public async Task AnalyticsService_RejectsInvalidParkComparisonWeeks()
+    {
+        var service = new QueueAnalyticsService(
+            new FakeQueueAnalyticsReader(),
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 8, 26, 13, 0, 0, TimeSpan.Zero)));
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.GetDailyParkWaitTimesAsync(
+                new DateOnly(2026, 8, 25),
+                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.GetDailyParkWaitTimesAsync(
+                new DateOnly(2026, 8, 31),
+                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.GetDailyParkWaitTimesAsync(
+                new DateOnly(2026, 5, 11),
+                CancellationToken.None));
+    }
+
+    [Fact]
     public async Task AnalyticsService_RejectsInvalidHistoricalWindow()
     {
         var from = new DateTimeOffset(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
@@ -333,6 +377,8 @@ public sealed class ApplicationTests
         public long? AttractionId { get; private set; }
         public DateTimeOffset? FromInclusive { get; private set; }
         public DateTimeOffset? ToExclusive { get; private set; }
+        public DateOnly? DailyParksFromInclusive { get; private set; }
+        public DateOnly? DailyParksToExclusive { get; private set; }
 
         public Task<IReadOnlyList<CurrentWaitTime>> GetCurrentWaitTimesAsync(
             long parkId,
@@ -361,6 +407,16 @@ public sealed class ApplicationTests
         {
             AttractionId = attractionId;
             return Task.FromResult<IReadOnlyList<DailyWaitTimeHistory>>([]);
+        }
+
+        public Task<IReadOnlyList<DailyParkWaitTime>> GetDailyParkWaitTimesAsync(
+            DateOnly fromInclusive,
+            DateOnly toExclusive,
+            CancellationToken cancellationToken)
+        {
+            DailyParksFromInclusive = fromInclusive;
+            DailyParksToExclusive = toExclusive;
+            return Task.FromResult<IReadOnlyList<DailyParkWaitTime>>([]);
         }
 
         public Task<IReadOnlyList<HistoricalWaitTimeObservation>>
