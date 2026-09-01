@@ -9,10 +9,19 @@ The solution collects attraction queue times and stores an append-only history i
 - `Disney.Infrastructure`: PostgreSQL/Dapper persistence, Queue-Times HTTP integration, migrations, and historical queries.
 - `Disney.Api`: versioned dashboard endpoints, OpenAPI, health checks, caching, and rate limiting.
 - `frontend`: React, TypeScript, Vite, TanStack Query, and ECharts dashboard served by Nginx.
+- `marketing-frontend`: independent React/Vite public site for product, pricing,
+  plan comparison, waitlist registration, and Stripe Checkout.
+- `company-frontend`: independent React/Vite operations portal for travel agencies
+  and tour operators.
 - `Worker`: scheduled process and dependency-injection composition.
 - `Disney.Tests`: unit and migration-shape tests.
 
 The API depends on `Disney.Application` contracts rather than querying PostgreSQL directly.
+
+## Deployment
+
+Read [the Azure worker and database deployment strategy](docs/azure-worker-database-deployment.md)
+before provisioning Azure resources or deploying additional parts of the solution.
 
 ## API
 
@@ -25,6 +34,20 @@ GET /api/v1/parks/{parkId}/analytics/wait-times/history?attractionId={attraction
 GET /api/v1/parks/{parkId}/analytics/wait-times/daily?attractionId={attractionId}
 GET /api/v1/parks/{parkId}/analytics/wait-times/weekday-quarter-hourly
 GET /api/v1/parks/{parkId}/analytics/closures/weekday-quarter-hourly
+POST /api/v1/waitlist
+GET /api/v1/billing/products
+POST /api/v1/billing/checkout-sessions
+POST /api/v1/billing/webhooks/stripe
+POST /api/v1/company/auth/bootstrap
+POST /api/v1/company/auth/login
+GET /api/v1/company/dashboard
+GET|POST /api/v1/company/customers
+GET|POST /api/v1/company/visits
+POST /api/v1/company/visits/{visitId}/entitlement
+POST /api/v1/company/visits/{visitId}/access-link
+GET /api/v1/company/credits
+POST /api/v1/company/billing/checkout-sessions
+POST /api/v1/company/integrations/reservations
 ```
 
 Historical observation queries use an inclusive `from`, exclusive `to`, and a maximum
@@ -57,6 +80,31 @@ docker compose up -d --build
 dotnet test Disney.slnx
 ```
 
-The dashboard is available at `http://localhost:8081`. For frontend-only development,
-run `npm install` and `npm run dev` from `frontend`; Vite proxies API requests to
+The dashboard is available at `http://localhost:8081`, the marketing site at
+`http://localhost:8082`, and the company portal at `http://localhost:8083`.
+For frontend-only development, run `npm install` and `npm run dev` from the
+relevant frontend directory. The applications proxy API requests to
 `http://localhost:8080`.
+
+Stripe Checkout remains disabled until these environment variables are set:
+
+```text
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+STRIPE_VISIT_PASS_PRICE_ID
+STRIPE_TRIP_PASS_PRICE_ID
+STRIPE_COMPANY_STARTER_PRICE_ID
+STRIPE_COMPANY_GROWTH_PRICE_ID
+```
+
+Use `STRIPE_SUCCESS_URL` and `STRIPE_CANCEL_URL` to override the default local
+marketing-site return URLs. Use `STRIPE_COMPANY_SUCCESS_URL` and
+`STRIPE_COMPANY_CANCEL_URL` for company credit checkout.
+
+Company authentication requires JWT issuer, audience, signing key, and token
+lifetime configuration under `CompanyAuthentication`. Development defaults are
+provided locally; production deployments must supply their own signing key.
+Invitations and visitor-access secrets are returned once and stored only as
+hashes. Notification outbox entries currently retain delivery metadata only;
+an external secure dispatcher is still required to deliver those one-time
+secrets by email or SMS.

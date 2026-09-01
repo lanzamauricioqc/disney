@@ -1,9 +1,13 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Disney.Api;
 using Disney.Application;
 using Disney.Infrastructure;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +37,26 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+    options.AddPolicy("company-auth", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+    options.AddPolicy("company-integration", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Request.Headers["X-Api-Key"].ToString() is { Length: > 0 } key
+                ? key[..Math.Min(key.Length, 12)]
+                : context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
 });
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -51,8 +75,54 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddDisneyInfrastructure(builder.Configuration);
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.Configure<CompanyJwtOptions>(
+    builder.Configuration.GetSection(CompanyJwtOptions.SectionName));
+var companyJwtOptions = builder.Configuration
+    .GetSection(CompanyJwtOptions.SectionName)
+    .Get<CompanyJwtOptions>() ?? new CompanyJwtOptions();
+var validationSigningKey = companyJwtOptions.IsValid
+    ? Encoding.UTF8.GetBytes(companyJwtOptions.SigningKey)
+    : RandomNumberGenerator.GetBytes(64);
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = companyJwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = companyJwtOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(validationSigningKey),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+            NameClaimType = "email",
+            RoleClaimType = "role",
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256]
+        };
+    });
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("CompanyMember", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim(CompanyClaimNames.OrganizationId);
+        policy.RequireClaim("sub");
+        policy.RequireClaim("email");
+        policy.RequireClaim("role");
+    })
+    .AddPolicy("CompanyTeamManagement", policy =>
+        policy.RequireRole("Owner", "Administrator"))
+    .AddPolicy("CompanyBillingManagement", policy =>
+        policy.RequireRole("Owner", "Administrator"))
+    .AddPolicy("CompanyConfigurationManagement", policy =>
+        policy.RequireRole("Owner", "Administrator"));
+builder.Services.AddSingleton<ICompanyTokenService, CompanyJwtTokenService>();
+builder.Services.AddScoped<CompanyService>();
 builder.Services.AddScoped<IQueueAnalyticsService, QueueAnalyticsService>();
 builder.Services.AddScoped<IQueueCollectionService, QueueCollectionService>();
+builder.Services.AddScoped<WaitlistService>();
+builder.Services.AddScoped<CheckoutService>();
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
@@ -62,6 +132,8 @@ application.UseExceptionHandler();
 application.UseRateLimiter();
 application.UseCors();
 application.UseOutputCache();
+application.UseAuthentication();
+application.UseAuthorization();
 application.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/openapi/v1.json", "Disney Queue Analytics API v1");
@@ -82,6 +154,8 @@ application.MapHealthChecks("/health/ready", new HealthCheckOptions
 application.MapParkEndpoints();
 application.MapQueueAnalyticsEndpoints();
 application.MapAdminEndpoints();
+application.MapCommercialEndpoints();
+application.MapCompanyEndpoints();
 
 await application.Services.GetRequiredService<IDatabaseMigrator>().MigrateAsync();
 application.Run();

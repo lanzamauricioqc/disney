@@ -1,4 +1,54 @@
 services:
+  company-frontend:
+    build:
+      context: ./company-frontend
+      dockerfile: Dockerfile
+
+    container_name: park-pilot-company-portal
+
+    depends_on:
+      api:
+        condition: service_started
+
+    environment:
+      API_UPSTREAM: "http://api:8080"
+
+    ports:
+      - "8083:8080"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/ > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    restart: unless-stopped
+
+  marketing-frontend:
+    build:
+      context: ./marketing-frontend
+      dockerfile: Dockerfile
+
+    container_name: park-pilot-marketing
+
+    depends_on:
+      api:
+        condition: service_started
+
+    environment:
+      API_UPSTREAM: "http://api:8080"
+
+    ports:
+      - "8082:8080"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/ > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    restart: unless-stopped
+
   frontend:
     build:
       context: .
@@ -38,7 +88,22 @@ services:
         condition: service_healthy
 
     environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=queue_times;Username=queue_user;Password=queue_password"
+      Stripe__SecretKey: "${STRIPE_SECRET_KEY:-}"
+      Stripe__WebhookSecret: "${STRIPE_WEBHOOK_SECRET:-}"
+      Stripe__SuccessUrl: "${STRIPE_SUCCESS_URL:-http://localhost:8082/checkout?status=success}"
+      Stripe__CancelUrl: "${STRIPE_CANCEL_URL:-http://localhost:8082/checkout?status=cancelled}"
+      Stripe__VisitPassPriceId: "${STRIPE_VISIT_PASS_PRICE_ID:-}"
+      Stripe__TripPassPriceId: "${STRIPE_TRIP_PASS_PRICE_ID:-}"
+      Stripe__CompanySuccessUrl: "${STRIPE_COMPANY_SUCCESS_URL:-http://localhost:8083/billing?status=success}"
+      Stripe__CompanyCancelUrl: "${STRIPE_COMPANY_CANCEL_URL:-http://localhost:8083/billing?status=cancelled}"
+      Stripe__CompanyCreditBundles__starter__PriceId: "${STRIPE_COMPANY_STARTER_PRICE_ID:-}"
+      Stripe__CompanyCreditBundles__starter__Credits: "25"
+      Stripe__CompanyCreditBundles__starter__DisplayName: "25 visit credits"
+      Stripe__CompanyCreditBundles__growth__PriceId: "${STRIPE_COMPANY_GROWTH_PRICE_ID:-}"
+      Stripe__CompanyCreditBundles__growth__Credits: "100"
+      Stripe__CompanyCreditBundles__growth__DisplayName: "100 visit credits"
 
     ports:
       - "8080:8080"

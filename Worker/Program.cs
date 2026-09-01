@@ -24,36 +24,31 @@ builder.Services.AddDisneyInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<QueueCollectionWorker>();
 builder.Services.AddScoped<IQueueCollectionService, QueueCollectionService>();
 builder.Services.AddScoped<IQueueCollectionJob, QueueCollectionJob>();
-builder.Services.Configure<QueueCollectionOptions>(
-    builder.Configuration.GetSection("QueueCollection"));
+builder.Services
+    .AddOptions<QueueCollectionOptions>()
+    .Bind(builder.Configuration.GetSection("QueueCollection"))
+    .Validate(
+        options => options.Interval > TimeSpan.Zero,
+        "QueueCollection:Interval must be greater than zero.")
+    .ValidateOnStart();
+builder.Services
+    .AddOptions<DatabaseStartupOptions>()
+    .Bind(builder.Configuration.GetSection(DatabaseStartupOptions.SectionName))
+    .Validate(
+        options => options.MaxAttempts > 0,
+        "DatabaseStartup:MaxAttempts must be greater than zero.")
+    .Validate(
+        options => options.InitialDelay > TimeSpan.Zero,
+        "DatabaseStartup:InitialDelay must be greater than zero.")
+    .Validate(
+        options => options.MaxDelay >= options.InitialDelay,
+        "DatabaseStartup:MaxDelay must be greater than or equal to InitialDelay.")
+    .ValidateOnStart();
+builder.Services.AddSingleton<DatabaseStartupInitializer>();
 
 var host = builder.Build();
 
-{
-    var logger = host.Services.GetRequiredService<ILoggerFactory>()
-        .CreateLogger("StartupDiagnostics");
-
-    try
-    {
-        var migrator = host.Services.GetRequiredService<IDatabaseMigrator>();
-        await migrator.MigrateAsync();
-        logger.LogInformation(
-            new EventId(5000, "DatabaseConnectivityCheckStarted"),
-            "Database connectivity check started.");
-        var healthCheck = host.Services.GetRequiredService<IDatabaseHealthCheck>();
-        await healthCheck.CheckAsync();
-        logger.LogInformation(
-            new EventId(5001, "DatabaseConnectivityCheckCompleted"),
-            "Database connectivity check completed successfully.");
-    }
-    catch (Exception exception)
-    {
-        logger.LogError(
-            new EventId(5002, "DatabaseConnectivityCheckFailed"),
-            exception,
-            "Database connectivity check failed.");
-        throw;
-    }
-}
+await host.Services.GetRequiredService<DatabaseStartupInitializer>()
+    .InitializeAsync();
 
 host.Run();

@@ -1,5 +1,6 @@
 using System.Data;
 using Dapper;
+using Disney.Domain;
 
 namespace Disney.Infrastructure;
 
@@ -11,6 +12,9 @@ internal static class DapperTypeHandlers
         SqlMapper.AddTypeHandler(new NullableDateOnlyHandler());
         SqlMapper.AddTypeHandler(new TimeOnlyHandler());
         SqlMapper.AddTypeHandler(new NullableTimeOnlyHandler());
+        SqlMapper.AddTypeHandler(new StringEnumHandler<CompanyRole>());
+        SqlMapper.AddTypeHandler(new StringEnumHandler<CompanyVisitStatus>());
+        SqlMapper.AddTypeHandler(new StringEnumHandler<NotificationDeliveryStatus>());
     }
 
     private sealed class DateOnlyHandler : SqlMapper.TypeHandler<DateOnly>
@@ -71,6 +75,23 @@ internal static class DapperTypeHandlers
         {
             parameter.DbType = DbType.Time;
             parameter.Value = value.HasValue ? value.Value.ToTimeSpan() : DBNull.Value;
+        }
+    }
+
+    private sealed class StringEnumHandler<TEnum> : SqlMapper.TypeHandler<TEnum>
+        where TEnum : struct, Enum
+    {
+        public override TEnum Parse(object value) =>
+            value is string text &&
+            Enum.TryParse<TEnum>(text, true, out var parsed)
+                ? parsed
+                : throw new InvalidCastException(
+                    $"Cannot convert {value} to {typeof(TEnum).Name}.");
+
+        public override void SetValue(IDbDataParameter parameter, TEnum value)
+        {
+            parameter.DbType = DbType.String;
+            parameter.Value = value.ToString().ToLowerInvariant();
         }
     }
 }

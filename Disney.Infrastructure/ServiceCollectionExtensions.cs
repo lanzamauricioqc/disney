@@ -18,6 +18,17 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IQueueCollectionStore, PostgreSqlQueueCollectionStore>();
         services.AddScoped<IQueueAnalyticsReader, PostgreSqlQueueAnalyticsReader>();
         services.AddScoped<IAdminRepository, PostgreSqlAdminRepository>();
+        services.AddScoped<IWaitlistRepository, PostgreSqlCommercialRepository>();
+        services.AddScoped<ICommercialRepository, PostgreSqlCommercialRepository>();
+        services.AddScoped<IPaymentCheckoutGateway, StripePaymentCheckoutGateway>();
+        services.AddScoped<IPaymentWebhookHandler, StripePaymentWebhookHandler>();
+        services.AddScoped<ICompanyRepository, PostgreSqlCompanyRepository>();
+        services.AddSingleton<ICompanyPasswordService, CompanyPasswordService>();
+        services.AddSingleton<ICompanySecretService, CompanySecretService>();
+        services.AddScoped<ICompanyNotificationOutbox, PostgreSqlCompanyNotificationOutbox>();
+        services.AddScoped<ICompanyBillingGateway, StripeCompanyBillingGateway>();
+        services.Configure<StripeOptions>(
+            configuration.GetSection(StripeOptions.SectionName));
         services.AddSingleton<QueueObservationFactory>();
 
         services.AddHttpClient<IQueueTimesProvider, QueueTimesClient>(httpClient =>
