@@ -4,7 +4,7 @@ export interface Plan {
   code: "free" | PlanCode;
   productCode: string;
   name: string;
-  price: string;
+  amount: number;
   cadence: string;
   description: string;
   features: string[];

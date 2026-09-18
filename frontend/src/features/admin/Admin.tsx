@@ -27,10 +27,12 @@ import type {
   SaveAdminLand,
   SaveAdminPark,
 } from '../../api/contracts'
+import { LanguageSelector, useI18n } from '../../i18n'
 
 type AdminTab = 'operations' | 'catalog' | 'observations' | 'runs'
 
 export function Admin() {
+  const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<AdminTab>('operations')
   const [selectedParkId, setSelectedParkId] = useState<number>()
   const [creatingPark, setCreatingPark] = useState(false)
@@ -54,28 +56,28 @@ export function Admin() {
         <Link className="brand" to="/">
           <AdminMark />
           <span>
-            <strong>Queue Intelligence</strong>
-            <small>Administration</small>
+            <strong>{t('brand')}</strong>
+            <small>{t('administration')}</small>
           </span>
         </Link>
-        <Link className="topbar-link" to="/">
-          Visitor dashboard
-        </Link>
+        <div className="topbar-actions">
+          <LanguageSelector />
+          <Link className="topbar-link" to="/">{t('visitorDashboard')}</Link>
+        </div>
       </header>
 
       <main className="admin-main">
         <header className="admin-header">
           <div>
-            <p className="eyebrow">Operations tooling</p>
-            <h1>Administration</h1>
+            <p className="eyebrow">{t('operationsTooling')}</p>
+            <h1>{t('administration')}</h1>
             <p className="page-description">
-              Maintain catalog data, monitor collection health, and manage queue
-              observations.
+              {t('adminDescription')}
             </p>
           </div>
           <div className="admin-park-controls">
             <label className="park-selector" htmlFor="admin-park-selector">
-              <span>Working park</span>
+              <span>{t('workingPark')}</span>
               <select
                 id="admin-park-selector"
                 value={selectedParkId ?? ''}
@@ -99,18 +101,18 @@ export function Admin() {
               }}
               type="button"
             >
-              Add park
+              {t('addPark')}
             </button>
           </div>
         </header>
 
-        <nav className="admin-tabs" aria-label="Administration sections">
+        <nav className="admin-tabs" aria-label={t('adminSections')}>
           {(
             [
-              ['operations', 'Operations'],
-              ['catalog', 'Catalog'],
-              ['observations', 'Observations'],
-              ['runs', 'Collection runs'],
+              ['operations', t('operations')],
+              ['catalog', t('catalog')],
+              ['observations', t('observations')],
+              ['runs', t('collectionRuns')],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -124,9 +126,9 @@ export function Admin() {
           ))}
         </nav>
 
-        {parksQuery.isLoading && <AdminStatus message="Loading administration data..." />}
+        {parksQuery.isLoading && <AdminStatus message={t('loadingAdmin')} />}
         {parksQuery.isError && (
-          <AdminStatus message="Administration data could not be loaded." error />
+          <AdminStatus message={t('adminUnavailable')} error />
         )}
         {creatingPark && activeTab === 'operations' && (
           <CreateParkPanel
@@ -152,6 +154,7 @@ export function Admin() {
 }
 
 function CreateParkPanel({ onCreated }: { onCreated: (parkId: number) => void }) {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const [form, setForm] = useState<SaveAdminPark>({
     sourceParkId: 0,
@@ -172,9 +175,9 @@ function CreateParkPanel({ onCreated }: { onCreated: (parkId: number) => void })
   return (
     <article className="surface admin-card admin-create-card">
       <AdminCardHeading
-        eyebrow="Catalog setup"
-        title="Add supported park"
-        detail="Use the external Queue-Times park identifier"
+        eyebrow={t('catalogSetup')}
+        title={t('addSupportedPark')}
+        detail={t('externalQueueId')}
       />
       <form
         className="admin-form"
@@ -184,14 +187,14 @@ function CreateParkPanel({ onCreated }: { onCreated: (parkId: number) => void })
         }}
       >
         <div className="form-grid two-columns">
-          <Field label="Park name">
+          <Field label={t('parkName')}>
             <input
               required
               value={form.name}
               onChange={(event) => setForm({ ...form, name: event.target.value })}
             />
           </Field>
-          <Field label="External park ID">
+          <Field label={t('externalParkId')}>
             <input
               min="1"
               required
@@ -202,7 +205,7 @@ function CreateParkPanel({ onCreated }: { onCreated: (parkId: number) => void })
               }
             />
           </Field>
-          <Field label="Timezone">
+          <Field label={t('timezone')}>
             <input
               required
               value={form.timezone}
@@ -211,7 +214,7 @@ function CreateParkPanel({ onCreated }: { onCreated: (parkId: number) => void })
               }
             />
           </Field>
-          <Field label="Collection interval">
+          <Field label={t('collectionInterval')}>
             <div className="input-suffix">
               <input
                 max="1440"
@@ -226,21 +229,21 @@ function CreateParkPanel({ onCreated }: { onCreated: (parkId: number) => void })
                   })
                 }
               />
-              <span>minutes</span>
+              <span>{t('minutesWord')}</span>
             </div>
           </Field>
         </div>
         <div className="toggle-row">
           <Toggle
             checked={form.collectionEnabled}
-            label="Start automatic collection"
+            label={t('startAutomatic')}
             onChange={(collectionEnabled) =>
               setForm({ ...form, collectionEnabled })
             }
           />
           <Toggle
             checked={form.isActive}
-            label="Park visible and active"
+            label={t('parkActive')}
             onChange={(isActive) => setForm({ ...form, isActive })}
           />
         </div>
@@ -249,7 +252,7 @@ function CreateParkPanel({ onCreated }: { onCreated: (parkId: number) => void })
           disabled={mutation.isPending}
           type="submit"
         >
-          {mutation.isPending ? 'Adding park...' : 'Add park'}
+          {mutation.isPending ? t('addingPark') : t('addPark')}
         </button>
         <MutationNotice error={mutation.error} />
       </form>
@@ -258,26 +261,23 @@ function CreateParkPanel({ onCreated }: { onCreated: (parkId: number) => void })
 }
 
 function OperationsPanel({ park }: { park: AdminPark }) {
+  const { locale, t } = useI18n()
   const queryClient = useQueryClient()
   const [form, setForm] = useState<SaveAdminPark>(() => parkToForm(park))
-  const [message, setMessage] = useState<string>()
 
   useEffect(() => {
     setForm(parkToForm(park))
-    setMessage(undefined)
   }, [park])
 
   const saveMutation = useMutation({
     mutationFn: () => saveAdminPark(park.id, form),
     onSuccess: async () => {
-      setMessage('Park settings saved.')
       await queryClient.invalidateQueries({ queryKey: ['admin', 'parks'] })
     },
   })
   const collectMutation = useMutation({
     mutationFn: () => collectAdminPark(park.id),
     onSuccess: async () => {
-      setMessage('Collection completed successfully.')
       await queryClient.invalidateQueries({ queryKey: ['admin'] })
     },
   })
@@ -286,34 +286,34 @@ function OperationsPanel({ park }: { park: AdminPark }) {
     <section className="admin-grid">
       <article className="surface admin-card">
         <AdminCardHeading
-          eyebrow="Collection health"
+          eyebrow={t('collectionHealth')}
           title={park.name}
           detail={
             park.lastCollectionSucceeded === false
-              ? 'Attention required'
+              ? t('attentionRequired')
               : park.collectionEnabled
-                ? 'Collection active'
-                : 'Collection paused'
+                ? t('collectionActive')
+                : t('collectionPaused')
           }
         />
         <div className="admin-metrics">
-          <AdminMetric label="Attractions" value={park.attractionCount.toString()} />
+          <AdminMetric label={t('attractions')} value={new Intl.NumberFormat(locale).format(park.attractionCount)} />
           <AdminMetric
-            label="Observations"
-            value={park.observationCount.toLocaleString()}
+            label={t('observations')}
+            value={new Intl.NumberFormat(locale).format(park.observationCount)}
           />
           <AdminMetric
-            label="Last attempt"
-            value={formatDateTime(park.lastCollectionStartedAt)}
+            label={t('lastAttempt')}
+            value={formatDateTime(park.lastCollectionStartedAt, locale, t('never'))}
           />
           <AdminMetric
-            label="Last result"
+            label={t('lastResult')}
             value={
               park.lastCollectionSucceeded === null
-                ? 'No runs'
+                ? t('noRuns')
                 : park.lastCollectionSucceeded
-                  ? 'Successful'
-                  : 'Failed'
+                  ? t('successful')
+                  : t('failed')
             }
           />
         </div>
@@ -327,20 +327,20 @@ function OperationsPanel({ park }: { park: AdminPark }) {
             onClick={() => collectMutation.mutate()}
             type="button"
           >
-            {collectMutation.isPending ? 'Collecting...' : 'Collect now'}
+            {collectMutation.isPending ? t('collecting') : t('collectNow')}
           </button>
           <span className="field-help">
-            Runs immediately without changing the automatic schedule.
+            {t('collectHelp')}
           </span>
         </div>
         <MutationNotice
           error={collectMutation.error}
-          message={collectMutation.isSuccess ? message : undefined}
+          message={collectMutation.isSuccess ? t('collectionSuccess') : undefined}
         />
       </article>
 
       <article className="surface admin-card">
-        <AdminCardHeading eyebrow="Configuration" title="Park settings" />
+        <AdminCardHeading eyebrow={t('configuration')} title={t('parkSettings')} />
         <form
           className="admin-form"
           onSubmit={(event) => {
@@ -349,14 +349,14 @@ function OperationsPanel({ park }: { park: AdminPark }) {
           }}
         >
           <div className="form-grid two-columns">
-            <Field label="Park name">
+            <Field label={t('parkName')}>
               <input
                 required
                 value={form.name}
                 onChange={(event) => setForm({ ...form, name: event.target.value })}
               />
             </Field>
-            <Field label="External park ID">
+            <Field label={t('externalParkId')}>
               <input
                 min="1"
                 required
@@ -367,7 +367,7 @@ function OperationsPanel({ park }: { park: AdminPark }) {
                 }
               />
             </Field>
-            <Field label="Timezone">
+            <Field label={t('timezone')}>
               <input
                 required
                 value={form.timezone}
@@ -376,7 +376,7 @@ function OperationsPanel({ park }: { park: AdminPark }) {
                 }
               />
             </Field>
-            <Field label="Collection interval">
+            <Field label={t('collectionInterval')}>
               <div className="input-suffix">
                 <input
                   max="1440"
@@ -391,21 +391,21 @@ function OperationsPanel({ park }: { park: AdminPark }) {
                     })
                   }
                 />
-                <span>minutes</span>
+                <span>{t('minutesWord')}</span>
               </div>
             </Field>
           </div>
           <div className="toggle-row">
             <Toggle
               checked={form.collectionEnabled}
-              label="Automatic collection"
+              label={t('automaticCollection')}
               onChange={(collectionEnabled) =>
                 setForm({ ...form, collectionEnabled })
               }
             />
             <Toggle
               checked={form.isActive}
-              label="Park visible and active"
+              label={t('parkActive')}
               onChange={(isActive) => setForm({ ...form, isActive })}
             />
           </div>
@@ -414,11 +414,11 @@ function OperationsPanel({ park }: { park: AdminPark }) {
             disabled={saveMutation.isPending}
             type="submit"
           >
-            {saveMutation.isPending ? 'Saving...' : 'Save settings'}
+            {saveMutation.isPending ? t('saving') : t('saveSettings')}
           </button>
           <MutationNotice
             error={saveMutation.error}
-            message={saveMutation.isSuccess ? message : undefined}
+            message={saveMutation.isSuccess ? t('parkSaved') : undefined}
           />
         </form>
       </article>
@@ -449,6 +449,7 @@ function CatalogPanel({ park }: { park: AdminPark }) {
 }
 
 function LandEditor({ park, lands }: { park: AdminPark; lands: AdminLand[] }) {
+  const { locale, t } = useI18n()
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState<number>()
   const selectedLand = lands.find((land) => land.id === selectedId)
@@ -479,9 +480,9 @@ function LandEditor({ park, lands }: { park: AdminPark; lands: AdminLand[] }) {
   return (
     <article className="surface admin-card catalog-editor">
       <AdminCardHeading
-        eyebrow="Park structure"
-        title="Lands"
-        detail={`${lands.length} configured`}
+        eyebrow={t('parkStructure')}
+        title={t('lands')}
+        detail={t('configured', { count: new Intl.NumberFormat(locale).format(lands.length) })}
       />
       <div className="catalog-layout">
         <div className="catalog-list" role="list">
@@ -490,8 +491,8 @@ function LandEditor({ park, lands }: { park: AdminPark; lands: AdminLand[] }) {
             onClick={() => setSelectedId(undefined)}
             type="button"
           >
-            <strong>+ Add land</strong>
-            <small>Create a manual catalog entry</small>
+            <strong>{t('addLandPlus')}</strong>
+            <small>{t('manualCatalogEntry')}</small>
           </button>
           {lands.map((land) => (
             <button
@@ -502,7 +503,7 @@ function LandEditor({ park, lands }: { park: AdminPark; lands: AdminLand[] }) {
             >
               <strong>{land.name}</strong>
               <small>
-                Source {land.sourceLandId} · {land.isActive ? 'Active' : 'Inactive'}
+                {t('source')} {new Intl.NumberFormat(locale).format(land.sourceLandId)} · {land.isActive ? t('active') : t('inactive')}
               </small>
             </button>
           ))}
@@ -514,14 +515,14 @@ function LandEditor({ park, lands }: { park: AdminPark; lands: AdminLand[] }) {
             mutation.mutate()
           }}
         >
-          <Field label="Land name">
+          <Field label={t('landName')}>
             <input
               required
               value={form.name}
               onChange={(event) => setForm({ ...form, name: event.target.value })}
             />
           </Field>
-          <Field label="External land ID">
+          <Field label={t('externalLandId')}>
             <input
               min="1"
               required
@@ -534,7 +535,7 @@ function LandEditor({ park, lands }: { park: AdminPark; lands: AdminLand[] }) {
           </Field>
           <Toggle
             checked={form.isActive}
-            label="Land active"
+            label={t('landActive')}
             onChange={(isActive) => setForm({ ...form, isActive })}
           />
           <button
@@ -542,7 +543,7 @@ function LandEditor({ park, lands }: { park: AdminPark; lands: AdminLand[] }) {
             disabled={mutation.isPending}
             type="submit"
           >
-            {selectedLand ? 'Save land' : 'Add land'}
+            {selectedLand ? t('saveLand') : t('addLand')}
           </button>
           <MutationNotice error={mutation.error} />
         </form>
@@ -560,6 +561,7 @@ function AttractionEditor({
   lands: AdminLand[]
   attractions: AdminAttraction[]
 }) {
+  const { locale, t } = useI18n()
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState<number>()
   const [search, setSearch] = useState('')
@@ -570,13 +572,13 @@ function AttractionEditor({
     emptyAttraction(park.id),
   )
   const filteredAttractions = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase()
+    const normalizedSearch = search.trim().toLocaleLowerCase(locale)
     return attractions.filter(
       (attraction) =>
         !normalizedSearch ||
-        attraction.name.toLocaleLowerCase().includes(normalizedSearch),
+        attraction.name.toLocaleLowerCase(locale).includes(normalizedSearch),
     )
-  }, [attractions, search])
+  }, [attractions, locale, search])
 
   useEffect(() => {
     setSelectedId(undefined)
@@ -607,16 +609,16 @@ function AttractionEditor({
   return (
     <article className="surface admin-card catalog-editor">
       <AdminCardHeading
-        eyebrow="Queue catalog"
-        title="Attractions"
-        detail={`${attractions.length} configured`}
+        eyebrow={t('queueCatalog')}
+        title={t('attractions')}
+        detail={t('configured', { count: new Intl.NumberFormat(locale).format(attractions.length) })}
       />
       <div className="catalog-layout">
         <div>
           <input
             className="catalog-search"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search attractions"
+            placeholder={t('searchAttractions')}
             type="search"
             value={search}
           />
@@ -626,8 +628,8 @@ function AttractionEditor({
               onClick={() => setSelectedId(undefined)}
               type="button"
             >
-              <strong>+ Add attraction</strong>
-              <small>Create a manual catalog entry</small>
+              <strong>{t('addAttractionPlus')}</strong>
+              <small>{t('manualCatalogEntry')}</small>
             </button>
             {filteredAttractions.map((attraction) => (
               <button
@@ -638,8 +640,8 @@ function AttractionEditor({
               >
                 <strong>{attraction.name}</strong>
                 <small>
-                  {attraction.landName ?? 'Park-wide'} ·{' '}
-                  {attraction.isActive ? 'Active' : 'Inactive'}
+                  {attraction.landName ?? t('parkWide')} ·{' '}
+                  {attraction.isActive ? t('active') : t('inactive')}
                 </small>
               </button>
             ))}
@@ -653,14 +655,14 @@ function AttractionEditor({
           }}
         >
           <div className="form-grid two-columns">
-            <Field label="Attraction name">
+            <Field label={t('attractionName')}>
               <input
                 required
                 value={form.name}
                 onChange={(event) => setForm({ ...form, name: event.target.value })}
               />
             </Field>
-            <Field label="External attraction ID">
+            <Field label={t('externalAttractionId')}>
               <input
                 min="1"
                 required
@@ -671,7 +673,7 @@ function AttractionEditor({
                 }
               />
             </Field>
-            <Field label="Land">
+            <Field label={t('land')}>
               <select
                 value={form.currentLandId ?? ''}
                 onChange={(event) =>
@@ -683,7 +685,7 @@ function AttractionEditor({
                   })
                 }
               >
-                <option value="">Park-wide</option>
+                <option value="">{t('parkWide')}</option>
                 {lands.map((land) => (
                   <option key={land.id} value={land.id}>
                     {land.name}
@@ -691,7 +693,7 @@ function AttractionEditor({
                 ))}
               </select>
             </Field>
-            <Field label="Duration">
+            <Field label={t('duration')}>
               <div className="input-suffix">
                 <input
                   min="1"
@@ -704,10 +706,10 @@ function AttractionEditor({
                     })
                   }
                 />
-                <span>minutes</span>
+                <span>{t('minutesWord')}</span>
               </div>
             </Field>
-            <Field label="Latitude">
+            <Field label={t('latitude')}>
               <input
                 max="90"
                 min="-90"
@@ -719,7 +721,7 @@ function AttractionEditor({
                 }
               />
             </Field>
-            <Field label="Longitude">
+            <Field label={t('longitude')}>
               <input
                 max="180"
                 min="-180"
@@ -734,7 +736,7 @@ function AttractionEditor({
           </div>
           <Toggle
             checked={form.isActive}
-            label="Attraction active"
+            label={t('attractionActive')}
             onChange={(isActive) => setForm({ ...form, isActive })}
           />
           <button
@@ -742,7 +744,7 @@ function AttractionEditor({
             disabled={mutation.isPending}
             type="submit"
           >
-            {selectedAttraction ? 'Save attraction' : 'Add attraction'}
+            {selectedAttraction ? t('saveAttraction') : t('addAttraction')}
           </button>
           <MutationNotice error={mutation.error} />
         </form>
@@ -752,6 +754,7 @@ function AttractionEditor({
 }
 
 function ObservationsPanel({ park }: { park: AdminPark }) {
+  const { locale, t } = useI18n()
   const queryClient = useQueryClient()
   const attractionsQuery = useQuery({
     queryKey: ['admin', 'attractions', park.id],
@@ -812,9 +815,9 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
     <section className="admin-stack">
       <article className="surface admin-card">
         <AdminCardHeading
-          eyebrow="Last-resort fallback"
-          title="Enter queue observation manually"
-          detail="Creates an auditable manual collection run"
+          eyebrow={t('lastResort')}
+          title={t('enterObservation')}
+          detail={t('auditableRun')}
         />
         <form
           className="admin-form"
@@ -824,15 +827,13 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
           }}
         >
           <div className="form-grid four-columns">
-            <Field label="Attraction">
+            <Field label={t('attraction')}>
               <select
                 required
                 value={attractionId ?? ''}
                 onChange={(event) => setAttractionId(Number(event.target.value))}
               >
-                <option disabled value="">
-                  Select attraction
-                </option>
+                <option disabled value="">{t('selectAttractionOption')}</option>
                 {attractionsQuery.data?.map((attraction) => (
                   <option key={attraction.id} value={attraction.id}>
                     {attraction.name}
@@ -840,7 +841,7 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
                 ))}
               </select>
             </Field>
-            <Field label="Observed at">
+            <Field label={t('observedAt')}>
               <input
                 required
                 type="datetime-local"
@@ -848,16 +849,16 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
                 onChange={(event) => setObservedAt(event.target.value)}
               />
             </Field>
-            <Field label="Status">
+            <Field label={t('status')}>
               <select
                 value={isOpen ? 'open' : 'closed'}
                 onChange={(event) => setIsOpen(event.target.value === 'open')}
               >
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
+                <option value="open">{t('open')}</option>
+                <option value="closed">{t('closed')}</option>
               </select>
             </Field>
-            <Field label="Wait time">
+            <Field label={t('waitTime')}>
               <div className="input-suffix">
                 <input
                   disabled={!isOpen}
@@ -867,7 +868,7 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
                   value={waitMinutes}
                   onChange={(event) => setWaitMinutes(Number(event.target.value))}
                 />
-                <span>minutes</span>
+                <span>{t('minutesWord')}</span>
               </div>
             </Field>
           </div>
@@ -877,17 +878,17 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
               disabled={!attractionId || createMutation.isPending}
               type="submit"
             >
-              {createMutation.isPending ? 'Saving...' : 'Save observation'}
+              {createMutation.isPending ? t('saving') : t('saveObservation')}
             </button>
             <span className="field-help">
-              Use only when automated collection and other sources are unavailable.
+              {t('manualHelp')}
             </span>
           </div>
           <MutationNotice
             error={createMutation.error}
             message={
               createMutation.isSuccess
-                ? 'Manual observation saved and available to live analytics.'
+                ? t('manualSaved')
                 : undefined
             }
           />
@@ -896,13 +897,13 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
 
       <article className="surface admin-card">
         <AdminCardHeading
-          eyebrow="Data review"
-          title="Recent observations"
-          detail="Latest 150 records"
+          eyebrow={t('dataReview')}
+          title={t('recentObservations')}
+          detail={t('latestRecords')}
         />
         <div className="admin-toolbar">
           <label>
-            <span>Filter attraction</span>
+            <span>{t('filterAttraction')}</span>
             <select
               value={attractionId ?? ''}
               onChange={(event) =>
@@ -911,7 +912,7 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
                 )
               }
             >
-              <option value="">All attractions</option>
+              <option value="">{t('allAttractions')}</option>
               {attractionsQuery.data?.map((attraction) => (
                 <option key={attraction.id} value={attraction.id}>
                   {attraction.name}
@@ -924,12 +925,12 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Attraction</th>
-                <th>Observed</th>
-                <th>Queue</th>
-                <th>Source</th>
-                <th>Status</th>
-                <th aria-label="Actions" />
+                <th>{t('attraction')}</th>
+                <th>{t('observed')}</th>
+                <th>{t('queue')}</th>
+                <th>{t('source')}</th>
+                <th>{t('status')}</th>
+                <th aria-label={t('actions')} />
               </tr>
             </thead>
             <tbody>
@@ -937,21 +938,21 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
                 <tr className={!observation.isValid ? 'invalid' : undefined} key={observation.id}>
                   <td>
                     <strong>{observation.attractionName}</strong>
-                    <small>{observation.landName ?? 'Park-wide'}</small>
+                    <small>{observation.landName ?? t('parkWide')}</small>
                   </td>
-                  <td>{formatDateTime(observation.observedAt)}</td>
+                  <td>{formatDateTime(observation.observedAt, locale, t('never'))}</td>
                   <td>
                     {observation.isOpen
-                      ? `${observation.waitMinutes ?? 0} min`
-                      : 'Closed'}
+                      ? `${new Intl.NumberFormat(locale).format(observation.waitMinutes ?? 0)} ${t('min')}`
+                      : t('closed')}
                   </td>
                   <td>
                     <span className="source-badge">{observation.triggerSource}</span>
                   </td>
                   <td>
                     {observation.isValid
-                      ? 'Valid'
-                      : `Invalid: ${observation.invalidReason}`}
+                      ? t('valid')
+                      : t('invalid', { reason: observation.invalidReason ?? '' })}
                   </td>
                   <td>
                     {observation.isValid ? (
@@ -960,7 +961,7 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
                         onClick={() => setInvalidatingId(observation.id)}
                         type="button"
                       >
-                        Invalidate
+                        {t('invalidate')}
                       </button>
                     ) : (
                       <button
@@ -973,7 +974,7 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
                         }
                         type="button"
                       >
-                        Restore
+                        {t('restore')}
                       </button>
                     )}
                   </td>
@@ -994,7 +995,7 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
               })
             }}
           >
-            <Field label="Reason for invalidation">
+            <Field label={t('invalidReason')}>
               <input
                 autoFocus
                 required
@@ -1003,14 +1004,14 @@ function ObservationsPanel({ park }: { park: AdminPark }) {
               />
             </Field>
             <button className="danger-button" type="submit">
-              Confirm invalidation
+              {t('confirmInvalidation')}
             </button>
             <button
               className="secondary-button"
               onClick={() => setInvalidatingId(undefined)}
               type="button"
             >
-              Cancel
+              {t('cancel')}
             </button>
           </form>
         )}
@@ -1032,6 +1033,7 @@ function PurgePanel({
   park: AdminPark
   attractions: AdminAttraction[]
 }) {
+  const { locale, t } = useI18n()
   const queryClient = useQueryClient()
   const [attractionId, setAttractionId] = useState<number | null>(null)
   const [from, setFrom] = useState('')
@@ -1055,11 +1057,10 @@ function PurgePanel({
 
   return (
     <details className="surface danger-zone">
-      <summary>Permanent data deletion</summary>
+      <summary>{t('permanentDeletion')}</summary>
       <div className="danger-zone-content">
         <p>
-          Permanently remove observations in a specific time range. Invalidating
-          records is safer and should be preferred.
+          {t('deletionHelp')}
         </p>
         <form
           className="admin-form"
@@ -1069,7 +1070,7 @@ function PurgePanel({
           }}
         >
           <div className="form-grid four-columns">
-            <Field label="Attraction">
+            <Field label={t('attraction')}>
               <select
                 value={attractionId ?? ''}
                 onChange={(event) =>
@@ -1078,7 +1079,7 @@ function PurgePanel({
                   )
                 }
               >
-                <option value="">All attractions</option>
+                <option value="">{t('allAttractions')}</option>
                 {attractions.map((attraction) => (
                   <option key={attraction.id} value={attraction.id}>
                     {attraction.name}
@@ -1086,7 +1087,7 @@ function PurgePanel({
                 ))}
               </select>
             </Field>
-            <Field label="From">
+            <Field label={t('from')}>
               <input
                 required
                 type="datetime-local"
@@ -1094,7 +1095,7 @@ function PurgePanel({
                 onChange={(event) => setFrom(event.target.value)}
               />
             </Field>
-            <Field label="To">
+            <Field label={t('to')}>
               <input
                 required
                 type="datetime-local"
@@ -1102,7 +1103,7 @@ function PurgePanel({
                 onChange={(event) => setTo(event.target.value)}
               />
             </Field>
-            <Field label="Type DELETE to confirm">
+            <Field label={t('typeDelete')}>
               <input
                 required
                 value={confirmation}
@@ -1115,13 +1116,13 @@ function PurgePanel({
             disabled={confirmation !== 'DELETE' || mutation.isPending}
             type="submit"
           >
-            Permanently delete observations
+            {t('deleteObservations')}
           </button>
           <MutationNotice
             error={mutation.error}
             message={
               mutation.data
-                ? `${mutation.data.deletedCount} observations deleted.`
+                ? t('deleted', { count: new Intl.NumberFormat(locale).format(mutation.data.deletedCount) })
                 : undefined
             }
           />
@@ -1132,6 +1133,7 @@ function PurgePanel({
 }
 
 function RunsPanel({ park }: { park: AdminPark }) {
+  const { locale, t } = useI18n()
   const queryClient = useQueryClient()
   const runsQuery = useQuery({
     queryKey: ['admin', 'runs', park.id],
@@ -1148,35 +1150,35 @@ function RunsPanel({ park }: { park: AdminPark }) {
   return (
     <article className="surface admin-card">
       <AdminCardHeading
-        eyebrow="Diagnostics"
-        title="Collection runs"
-        detail="Most recent 100 attempts"
+        eyebrow={t('diagnostics')}
+        title={t('collectionRuns')}
+        detail={t('recentAttempts')}
       />
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Started</th>
-              <th>Result</th>
-              <th>Source</th>
-              <th>Observations</th>
-              <th>Error</th>
-              <th aria-label="Actions" />
+              <th>{t('started')}</th>
+              <th>{t('result')}</th>
+              <th>{t('source')}</th>
+              <th>{t('observations')}</th>
+              <th>{t('error')}</th>
+              <th aria-label={t('actions')} />
             </tr>
           </thead>
           <tbody>
             {runsQuery.data?.map((run) => (
               <tr key={run.id}>
-                <td>{formatDateTime(run.startedAt)}</td>
+                <td>{formatDateTime(run.startedAt, locale, t('never'))}</td>
                 <td>
                   <span className={run.success ? 'status-pill success' : 'status-pill error'}>
-                    {run.success ? 'Successful' : 'Failed'}
+                    {run.success ? t('successful') : t('failed')}
                   </span>
                 </td>
                 <td>
                   <span className="source-badge">{run.triggerSource}</span>
                 </td>
-                <td>{run.observationCount}</td>
+                <td>{new Intl.NumberFormat(locale).format(run.observationCount)}</td>
                 <td className="error-cell">{run.errorMessage ?? '—'}</td>
                 <td>
                   {!run.success && (
@@ -1186,7 +1188,7 @@ function RunsPanel({ park }: { park: AdminPark }) {
                       onClick={() => retryMutation.mutate(run.id)}
                       type="button"
                     >
-                      Retry
+                      {t('retry')}
                     </button>
                   )}
                 </td>
@@ -1198,7 +1200,7 @@ function RunsPanel({ park }: { park: AdminPark }) {
       <MutationNotice
         error={retryMutation.error}
         message={
-          retryMutation.isSuccess ? 'Collection retry completed successfully.' : undefined
+          retryMutation.isSuccess ? t('retrySuccess') : undefined
         }
       />
     </article>
@@ -1278,8 +1280,9 @@ function MutationNotice({
   error: Error | null
   message?: string
 }) {
+  const { t } = useI18n()
   if (error) {
-    return <div className="mutation-notice error">{error.message}</div>
+    return <div className="mutation-notice error">{t('mutationError', { message: error.message })}</div>
   }
   return message ? <div className="mutation-notice success">{message}</div> : null
 }
@@ -1363,11 +1366,11 @@ function localDateTimeValue() {
   return localTime.toISOString().slice(0, 16)
 }
 
-function formatDateTime(value: string | null) {
+function formatDateTime(value: string | null, locale: string, empty: string) {
   return value
-    ? new Intl.DateTimeFormat(undefined, {
+    ? new Intl.DateTimeFormat(locale, {
         dateStyle: 'medium',
         timeStyle: 'short',
       }).format(new Date(value))
-    : 'Never'
+    : empty
 }

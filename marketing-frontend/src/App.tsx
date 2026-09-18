@@ -7,9 +7,11 @@ import { ComparePage } from "./pages/ComparePage";
 import { CheckoutPage } from "./pages/CheckoutPage";
 import { CompaniesPage } from "./pages/CompaniesPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { useI18n } from "./i18n";
 
 export function App() {
-  return <Routes><Route element={<Layout />}>
+  const { t } = useI18n();
+  return <><a className="skip-link" href="#main-content">{t("Skip to content")}</a><Routes><Route element={<Layout />}>
     <Route index element={<LandingPage />} />
     <Route path="product" element={<ProductPage />} />
     <Route path="pricing" element={<PricingPage />} />
@@ -17,5 +19,5 @@ export function App() {
     <Route path="checkout" element={<CheckoutPage />} />
     <Route path="companies" element={<CompaniesPage />} />
     <Route path="*" element={<NotFoundPage />} />
-  </Route></Routes>;
+  </Route></Routes></>;
 }

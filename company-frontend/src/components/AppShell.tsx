@@ -1,27 +1,13 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth, userLabel } from "../AuthContext";
+import { LanguageSelector, localizedValue, useI18n } from "../i18n";
 
 const navigation = [
-  ["/", "⌂", "Overview", "member"],
-  ["/customers", "◎", "Customers", "member"],
-  ["/visits", "↗", "Visits", "member"],
-  ["/team", "♙", "Team", "administrator"],
-  ["/branding", "◇", "Branding", "administrator"],
-  ["/billing", "◫", "Credits & billing", "administrator"],
-  ["/reports", "▥", "Reports", "member"],
-  ["/integrations", "⌁", "Integrations", "administrator"],
-  ["/settings", "⚙", "Settings", "administrator"],
-];
-
+  ["/", "⌂", "Overview", "member"], ["/customers", "◎", "Customers", "member"], ["/visits", "↗", "Visits", "member"], ["/team", "♙", "Team", "administrator"], ["/branding", "◇", "Branding", "administrator"], ["/billing", "◫", "Credits & billing", "administrator"], ["/reports", "▥", "Reports", "member"], ["/integrations", "⌁", "Integrations", "administrator"], ["/settings", "⚙", "Settings", "administrator"],
+] as const;
 export function AppShell() {
-  const { session, logout } = useAuth(); const [open, setOpen] = useState(false); const user = session?.user;
-  const canAdminister = ["Owner", "Administrator"].includes(user?.role ?? "");
-  const visibleNavigation = navigation.filter(([, , , permission]) =>
-    permission === "member" || canAdminister);
-  return <div className="portal-shell">
-    <aside className={`sidebar ${open ? "sidebar--open" : ""}`}><div className="sidebar-brand"><span className="brand-mark"><i /></span><div><strong>Park Pilot</strong><small>COMPANY</small></div><button onClick={() => setOpen(false)} aria-label="Close navigation">×</button></div><div className="org-card"><span>{(user?.organizationName || "O").charAt(0)}</span><div><small>ORGANIZATION</small><strong>{user?.organizationName || "Company workspace"}</strong></div></div>    <nav aria-label="Portal navigation">{visibleNavigation.map(([to, icon, label]) => <NavLink key={to} to={to} end={to === "/"} onClick={() => setOpen(false)}><span aria-hidden="true">{icon}</span>{label}</NavLink>)}</nav><div className="sidebar-foot"><div className="user-avatar">{userLabel(user).charAt(0).toUpperCase()}</div><div><strong>{userLabel(user)}</strong><small>{user?.role || "Staff"}</small></div><button onClick={logout} aria-label="Log out" title="Log out">↪</button></div></aside>
-    <div className="portal-main"><header className="mobile-header"><button onClick={() => setOpen(true)} aria-label="Open navigation">☰</button><strong>Park Pilot <span>Company</span></strong><div className="user-avatar">{userLabel(user).charAt(0).toUpperCase()}</div></header><main id="main-content"><Outlet /></main></div>
-    {open && <button className="nav-scrim" onClick={() => setOpen(false)} aria-label="Close navigation overlay" />}
-  </div>;
+  const { session, logout } = useAuth(); const { t } = useI18n(); const [open, setOpen] = useState(false); const user = session?.user; const label = userLabel(user, t("Company user"));
+  const canAdminister = ["Owner", "Administrator"].includes(user?.role ?? ""); const visibleNavigation = navigation.filter(([, , , permission]) => permission === "member" || canAdminister);
+  return <div className="portal-shell"><aside className={`sidebar ${open ? "sidebar--open" : ""}`}><div className="sidebar-brand"><span className="brand-mark"><i /></span><div><strong>Park Pilot</strong><small>{t("COMPANY")}</small></div><button onClick={() => setOpen(false)} aria-label={t("Close navigation")}>×</button></div><div className="org-card"><span>{(user?.organizationName || "O").charAt(0)}</span><div><small>{t("ORGANIZATION")}</small><strong>{user?.organizationName || t("Company workspace")}</strong></div></div><nav aria-label={t("Portal navigation")}>{visibleNavigation.map(([to, icon, message]) => <NavLink key={to} to={to} end={to === "/"} onClick={() => setOpen(false)}><span aria-hidden="true">{icon}</span>{t(message)}</NavLink>)}</nav><LanguageSelector className="language-selector--sidebar" /><div className="sidebar-foot"><div className="user-avatar">{label.charAt(0).toUpperCase()}</div><div><strong>{label}</strong><small>{localizedValue(user?.role || "Staff", t)}</small></div><button onClick={logout} aria-label={t("Log out")} title={t("Log out")}>↪</button></div></aside><div className="portal-main"><header className="mobile-header"><button onClick={() => setOpen(true)} aria-label={t("Open navigation")}>☰</button><strong>Park Pilot <span>{t("COMPANY")}</span></strong><div className="user-avatar">{label.charAt(0).toUpperCase()}</div></header><main id="main-content"><Outlet /></main></div>{open && <button className="nav-scrim" onClick={() => setOpen(false)} aria-label={t("Close navigation overlay")} />}</div>;
 }

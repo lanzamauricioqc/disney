@@ -15,12 +15,14 @@ import {
   createPatternChartOption,
 } from './chartOptions'
 import { formatObservedAt, formatWindow } from './formatters'
+import { LanguageSelector, useI18n } from '../../i18n'
 
 const EChart = lazy(() =>
   import('../../components/EChart').then((module) => ({ default: module.EChart })),
 )
 
 export function Dashboard() {
+  const { locale, t } = useI18n()
   const [selectedParkId, setSelectedParkId] = useState<number>()
   const [selectedAttractionId, setSelectedAttractionId] = useState<number>()
   const [selectedLand, setSelectedLand] = useState('all')
@@ -59,27 +61,27 @@ export function Dashboard() {
     const lands = new Map<string, string>()
 
     attractions.forEach((attraction) => {
-      lands.set(getLandFilterValue(attraction), attraction.landName ?? 'Park-wide')
+      lands.set(getLandFilterValue(attraction), attraction.landName ?? t('parkWide'))
     })
 
     return [...lands.entries()].sort((left, right) =>
-      left[1].localeCompare(right[1]),
+      left[1].localeCompare(right[1], locale),
     )
-  }, [attractions])
+  }, [attractions, locale, t])
 
   const filteredAttractions = useMemo(() => {
-    const normalizedNameFilter = attractionNameFilter.trim().toLocaleLowerCase()
+    const normalizedNameFilter = attractionNameFilter.trim().toLocaleLowerCase(locale)
 
     return attractions.filter((attraction) => {
       const matchesLand =
         selectedLand === 'all' || getLandFilterValue(attraction) === selectedLand
       const matchesName =
         !normalizedNameFilter ||
-        attraction.attractionName.toLocaleLowerCase().includes(normalizedNameFilter)
+        attraction.attractionName.toLocaleLowerCase(locale).includes(normalizedNameFilter)
 
       return matchesLand && matchesName
     })
-  }, [attractionNameFilter, attractions, selectedLand])
+  }, [attractionNameFilter, attractions, locale, selectedLand])
 
   useEffect(() => {
     if (!filteredAttractions.length) {
@@ -125,30 +127,29 @@ export function Dashboard() {
   const averageCurrentWait = calculateAverageCurrentWait(attractions)
 
   if (parksQuery.isLoading) {
-    return <StatusScreen message="Loading park intelligence..." />
+    return <StatusScreen message={t('loadingParks')} />
   }
 
   if (parksQuery.isError) {
-    return <StatusScreen message="The park catalog is unavailable." error />
+    return <StatusScreen message={t('catalogUnavailable')} error />
   }
 
   return (
     <div className="application-shell">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="Park Queue Intelligence home">
+        <a className="brand" href="/" aria-label={t('home')}>
           <BrandMark />
           <span>
-            <strong>Queue Intelligence</strong>
-            <small>Park operations</small>
+            <strong>{t('brand')}</strong>
+            <small>{t('parkOperations')}</small>
           </span>
         </a>
         <div className="topbar-actions">
-          <Link className="topbar-link" to="/admin">
-            Administration
-          </Link>
+          <LanguageSelector />
+          <Link className="topbar-link" to="/admin">{t('administration')}</Link>
           <div className="topbar-status">
             <span className="status-dot" aria-hidden="true" />
-            Data service online
+            {t('serviceOnline')}
           </div>
         </div>
       </header>
@@ -156,14 +157,14 @@ export function Dashboard() {
       <main>
         <header className="page-header">
           <div>
-            <p className="eyebrow">Live operations</p>
-            <h1>Attraction wait times</h1>
+            <p className="eyebrow">{t('liveOperations')}</p>
+            <h1>{t('waitTimes')}</h1>
             <p className="page-description">
-              Monitor current queues and compare three months of historical patterns.
+              {t('dashboardDescription')}
             </p>
           </div>
           <label className="park-selector" htmlFor="park-selector">
-            <span>Viewing park</span>
+            <span>{t('viewingPark')}</span>
             <select
               id="park-selector"
               value={selectedParkId ?? ''}
@@ -183,23 +184,23 @@ export function Dashboard() {
           </label>
         </header>
 
-        <section className="summary-bar" aria-label="Park summary">
-          <Metric label="Tracked attractions" value={attractions.length.toString()} />
-          <Metric label="Currently open" value={openCount.toString()} accent />
+        <section className="summary-bar" aria-label={t('parkSummary')}>
+          <Metric label={t('trackedAttractions')} value={new Intl.NumberFormat(locale).format(attractions.length)} />
+          <Metric label={t('currentlyOpen')} value={new Intl.NumberFormat(locale).format(openCount)} accent />
           <Metric
-            label="Average current wait"
-            value={averageCurrentWait === null ? '--' : `${averageCurrentWait} min`}
+            label={t('averageCurrentWait')}
+            value={averageCurrentWait === null ? '--' : `${new Intl.NumberFormat(locale).format(averageCurrentWait)} ${t('min')}`}
           />
-          <Metric label="Park timezone" value={selectedPark?.timezone ?? '--'} compact />
+          <Metric label={t('parkTimezone')} value={selectedPark?.timezone ?? '--'} compact />
         </section>
 
         <article className="surface chart-panel weekly-park-panel">
           <div className="panel-heading weekly-park-heading">
             <div>
-              <p className="eyebrow">Daily park comparison</p>
-              <h2>Average wait across each park</h2>
+              <p className="eyebrow">{t('dailyComparison')}</p>
+              <h2>{t('averageEachPark')}</h2>
               <p className="metric-description">
-                Each attraction contributes one daily average, regardless of sample count.
+                {t('dailyDescription')}
               </p>
             </div>
             <WeekNavigation
@@ -214,12 +215,14 @@ export function Dashboard() {
             empty={!dailyParksQuery.data?.parks.length}
           >
             {dailyParksQuery.data && (
-              <Suspense fallback={<InlineStatus message="Preparing chart..." />}>
+              <Suspense fallback={<InlineStatus message={t('preparingChart')} />}>
                 <EChart
-                  ariaLabel={`Daily average park wait times from ${dailyParksQuery.data.weekStart} through ${dailyParksQuery.data.weekEnd}`}
+                  ariaLabel={t('dailyParkAria', { start: formatDashboardDate(dailyParksQuery.data.weekStart, locale), end: formatDashboardDate(dailyParksQuery.data.weekEnd, locale) })}
                   option={createDailyParkChartOption(
                     dailyParksQuery.data.weekStart,
                     dailyParksQuery.data.parks,
+                    locale,
+                    t,
                   )}
                 />
               </Suspense>
@@ -231,27 +234,27 @@ export function Dashboard() {
           <article className="surface queue-panel">
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Current conditions</p>
-                <h2>Attraction queues</h2>
+                <p className="eyebrow">{t('currentConditions')}</p>
+                <h2>{t('attractionQueues')}</h2>
               </div>
               <div className="live-status">
-                <span className="live-indicator">Live</span>
+                <span className="live-indicator">{t('live')}</span>
                 {currentWaitsQuery.data && (
                   <span className="updated-at">
-                    Updated {formatObservedAt(currentWaitsQuery.data.generatedAt)}
+                    {t('updated', { date: formatObservedAt(currentWaitsQuery.data.generatedAt, locale) })}
                   </span>
                 )}
               </div>
             </div>
-            <div className="queue-filters" aria-label="Filter attraction queues">
+            <div className="queue-filters" aria-label={t('filterQueues')}>
               <label>
-                <span>Land</span>
+                <span>{t('land')}</span>
                 <select
-                  aria-label="Filter attractions by land"
+                  aria-label={t('filterLand')}
                   value={selectedLand}
                   onChange={(event) => setSelectedLand(event.target.value)}
                 >
-                  <option value="all">All lands</option>
+                  <option value="all">{t('allLands')}</option>
                   {landOptions.map(([value, name]) => (
                     <option key={value} value={value}>
                       {name}
@@ -260,35 +263,35 @@ export function Dashboard() {
                 </select>
               </label>
               <label>
-                <span>Attraction name</span>
+                <span>{t('attractionName')}</span>
                 <input
-                  aria-label="Filter attractions by name"
+                  aria-label={t('filterName')}
                   onChange={(event) => setAttractionNameFilter(event.target.value)}
-                  placeholder="Search attractions"
+                  placeholder={t('searchAttractions')}
                   type="search"
                   value={attractionNameFilter}
                 />
               </label>
             </div>
             <div className="queue-column-labels" aria-hidden="true">
-              <span>Attraction</span>
-              <span>Wait</span>
+              <span>{t('attraction')}</span>
+              <span>{t('wait')}</span>
             </div>
 
             {currentWaitsQuery.isLoading && <QueueSkeleton />}
             {currentWaitsQuery.isError && (
-              <InlineStatus message="Current waits could not be loaded." error />
+              <InlineStatus message={t('currentWaitsUnavailable')} error />
             )}
             {!currentWaitsQuery.isLoading &&
               !currentWaitsQuery.isError &&
               attractions.length === 0 && (
-                <InlineStatus message="No attraction observations are available yet." />
+                <InlineStatus message={t('noObservations')} />
               )}
             {!currentWaitsQuery.isLoading &&
               !currentWaitsQuery.isError &&
               attractions.length > 0 &&
               filteredAttractions.length === 0 && (
-                <InlineStatus message="No attractions match the selected filters." />
+                <InlineStatus message={t('noFilterMatches')} />
               )}
             <div className="queue-list">
               {filteredAttractions.map((attraction) => (
@@ -306,10 +309,10 @@ export function Dashboard() {
                   <span className="queue-copy">
                     <strong>{attraction.attractionName}</strong>
                     <small>
-                      {attraction.landName ?? 'Park-wide'}
+                      {attraction.landName ?? t('parkWide')}
                       <span aria-hidden="true"> · </span>
                       <span className="observation-time">
-                        {formatObservedAt(attraction.observedAt)}
+                        {formatObservedAt(attraction.observedAt, locale)}
                       </span>
                     </small>
                   </span>
@@ -322,13 +325,14 @@ export function Dashboard() {
           <div className="analytics-column">
             <article className="surface chart-panel">
               <PanelTitle
-                eyebrow="Three-month trend"
-                title={selectedAttraction?.attractionName ?? 'Select an attraction'}
+                eyebrow={t('threeMonthTrend')}
+                title={selectedAttraction?.attractionName ?? t('selectAttraction')}
                 detail={
                   historyQuery.data
                     ? formatWindow(
                         historyQuery.data.windowStart,
                         historyQuery.data.windowEnd,
+                        locale,
                       )
                     : undefined
                 }
@@ -339,10 +343,10 @@ export function Dashboard() {
                 empty={!historyQuery.data?.history.length}
               >
                 {historyQuery.data && (
-                  <Suspense fallback={<InlineStatus message="Preparing chart..." />}>
+                  <Suspense fallback={<InlineStatus message={t('preparingChart')} />}>
                     <EChart
-                      ariaLabel={`Daily wait-time history for ${selectedAttraction?.attractionName}`}
-                      option={createHistoryChartOption(historyQuery.data.history)}
+                      ariaLabel={t('dailyHistoryAria', { name: selectedAttraction?.attractionName ?? '' })}
+                      option={createHistoryChartOption(historyQuery.data.history, locale, t)}
                     />
                   </Suspense>
                 )}
@@ -351,9 +355,9 @@ export function Dashboard() {
 
             <article className="surface chart-panel">
               <PanelTitle
-                eyebrow="Typical demand"
-                title="Wait by weekday and time"
-                detail="15-minute averages"
+                eyebrow={t('typicalDemand')}
+                title={t('waitByWeekday')}
+                detail={t('averages15')}
               />
               <ChartContent
                 loading={patternsQuery.isLoading}
@@ -361,10 +365,10 @@ export function Dashboard() {
                 empty={!patternsQuery.data?.patterns.length}
               >
                 {patternsQuery.data && (
-                  <Suspense fallback={<InlineStatus message="Preparing chart..." />}>
+                  <Suspense fallback={<InlineStatus message={t('preparingChart')} />}>
                     <EChart
-                      ariaLabel={`Average waits by weekday and time for ${selectedAttraction?.attractionName}`}
-                      option={createPatternChartOption(patternsQuery.data.patterns)}
+                      ariaLabel={t('patternAria', { name: selectedAttraction?.attractionName ?? '' })}
+                      option={createPatternChartOption(patternsQuery.data.patterns, locale, t)}
                     />
                   </Suspense>
                 )}
@@ -386,8 +390,9 @@ function WeekNavigation({
   disabled: boolean
   onChange: (weekStart: string) => void
 }) {
+  const { locale, t } = useI18n()
   if (!data) {
-    return <span className="panel-detail">Current week</span>
+    return <span className="panel-detail">{t('currentWeek')}</span>
   }
 
   const previousWeekStart = addDays(data.weekStart, -7)
@@ -397,11 +402,11 @@ function WeekNavigation({
   const canGoForward = nextWeekStart <= data.currentWeekStart
 
   return (
-    <div className="week-navigation" aria-label="Select comparison week">
-      <span>{formatWeekRange(data.weekStart, data.weekEnd)}</span>
+    <div className="week-navigation" aria-label={t('selectWeek')}>
+      <span>{formatWeekRange(data.weekStart, data.weekEnd, locale)}</span>
       <div>
         <button
-          aria-label="View previous week"
+          aria-label={t('previousWeek')}
           disabled={disabled || !canGoBack}
           onClick={() => onChange(previousWeekStart)}
           type="button"
@@ -409,7 +414,7 @@ function WeekNavigation({
           ‹
         </button>
         <button
-          aria-label="View next week"
+          aria-label={t('nextWeek')}
           disabled={disabled || !canGoForward}
           onClick={() => onChange(nextWeekStart)}
           type="button"
@@ -441,14 +446,15 @@ function Metric({
 }
 
 function WaitBadge({ attraction }: { attraction: CurrentWaitTime }) {
+  const { locale, t } = useI18n()
   if (!attraction.isOpen) {
-    return <span className="wait-badge closed">Closed</span>
+    return <span className="wait-badge closed">{t('closed')}</span>
   }
 
   return (
     <span className={getWaitBadgeClassName(attraction.waitMinutes)}>
-      <strong>{attraction.waitMinutes ?? '--'}</strong>
-      <small>min</small>
+      <strong>{attraction.waitMinutes === null ? '--' : new Intl.NumberFormat(locale).format(attraction.waitMinutes)}</strong>
+      <small>{t('min')}</small>
     </span>
   )
 }
@@ -484,14 +490,15 @@ function ChartContent({
   empty: boolean
   children: React.ReactNode
 }) {
+  const { t } = useI18n()
   if (loading) {
-    return <InlineStatus message="Loading analytics..." />
+    return <InlineStatus message={t('loadingAnalytics')} />
   }
   if (error) {
-    return <InlineStatus message="Analytics could not be loaded." />
+    return <InlineStatus message={t('analyticsUnavailable')} />
   }
   if (empty) {
-    return <InlineStatus message="Not enough observations are available yet." />
+    return <InlineStatus message={t('notEnoughData')} />
   }
   return children
 }
@@ -514,10 +521,11 @@ function InlineStatus({
 }
 
 function StatusScreen({ message, error = false }: { message: string; error?: boolean }) {
+  const { t } = useI18n()
   return (
     <div className="status-screen" role={error ? 'alert' : 'status'}>
       <BrandMark />
-      <p className="eyebrow">{error ? 'Connection error' : 'Please wait'}</p>
+      <p className="eyebrow">{error ? t('connectionError') : t('pleaseWait')}</p>
       <h1>{message}</h1>
       {!error && <div className="loading-line" aria-hidden="true" />}
     </div>
@@ -525,8 +533,9 @@ function StatusScreen({ message, error = false }: { message: string; error?: boo
 }
 
 function QueueSkeleton() {
+  const { t } = useI18n()
   return (
-    <div className="queue-skeleton" aria-label="Loading current attraction waits">
+    <div className="queue-skeleton" aria-label={t('loadingWaits')}>
       {Array.from({ length: 7 }, (_, index) => (
         <div className="skeleton-row" key={index}>
           <span />
@@ -584,8 +593,8 @@ function addDays(date: string, days: number) {
   return parsedDate.toISOString().slice(0, 10)
 }
 
-function formatWeekRange(weekStart: string, weekEnd: string) {
-  const formatter = new Intl.DateTimeFormat(undefined, {
+function formatWeekRange(weekStart: string, weekEnd: string, locale: string) {
+  const formatter = new Intl.DateTimeFormat(locale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -594,4 +603,9 @@ function formatWeekRange(weekStart: string, weekEnd: string) {
   return `${formatter.format(new Date(`${weekStart}T12:00:00Z`))} – ${formatter.format(
     new Date(`${weekEnd}T12:00:00Z`),
   )}`
+}
+
+
+function formatDashboardDate(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`))
 }

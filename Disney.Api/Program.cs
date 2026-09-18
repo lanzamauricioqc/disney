@@ -7,6 +7,7 @@ using Disney.Application;
 using Disney.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -123,8 +124,20 @@ builder.Services.AddScoped<IQueueAnalyticsService, QueueAnalyticsService>();
 builder.Services.AddScoped<IQueueCollectionService, QueueCollectionService>();
 builder.Services.AddScoped<WaitlistService>();
 builder.Services.AddScoped<CheckoutService>();
+builder.Services
+    .AddOptions<QueueTimesHealthCheckOptions>()
+    .Bind(builder.Configuration.GetSection(QueueTimesHealthCheckOptions.SectionName))
+    .Validate(
+        options => options.SourceParkId > 0,
+        "HealthChecks:QueueTimes:SourceParkId must be greater than zero.")
+    .ValidateOnStart();
 builder.Services.AddHealthChecks()
-    .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
+    .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"])
+    .AddCheck<QueueTimesHealthCheck>(
+        "queue-times",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["queue-times"],
+        timeout: TimeSpan.FromSeconds(5));
 
 var application = builder.Build();
 
@@ -150,6 +163,10 @@ application.MapHealthChecks("/health/live", new HealthCheckOptions
 application.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = registration => registration.Tags.Contains("ready")
+});
+application.MapHealthChecks("/health/dependencies/queue-times", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("queue-times")
 });
 application.MapParkEndpoints();
 application.MapQueueAnalyticsEndpoints();

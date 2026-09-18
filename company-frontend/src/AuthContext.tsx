@@ -17,4 +17,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error("useAuth must be used inside AuthProvider"); return value; }
-export function userLabel(user?: CompanyUser) { return user?.name || user?.email || "Company user"; }
+export function userLabel(user?: CompanyUser, fallback = "Company user") { return user?.name || user?.email || fallback; }

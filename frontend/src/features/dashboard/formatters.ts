@@ -1,5 +1,5 @@
-export function formatObservedAt(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
+export function formatObservedAt(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -7,8 +7,8 @@ export function formatObservedAt(value: string) {
   }).format(new Date(value))
 }
 
-export function formatWindow(start: string, end: string) {
-  const formatter = new Intl.DateTimeFormat(undefined, {
+export function formatWindow(start: string, end: string, locale: string) {
+  const formatter = new Intl.DateTimeFormat(locale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',

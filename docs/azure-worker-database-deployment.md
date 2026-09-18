@@ -47,8 +47,9 @@ against short readiness delays; it is not a replacement for correct orchestratio
 
 ## Recommended Azure resources
 
-Deploy all resources in **Canada Central** unless a later data residency or service
-availability requirement dictates otherwise.
+The development Terraform configuration defaults to **Canada East**, which is located
+in Quebec City. Reassess **Canada Central** for production if availability zones and
+broader regional service availability become more important.
 
 | Concern | Initial service | Initial configuration |
 | --- | --- | --- |
@@ -58,7 +59,7 @@ availability requirement dictates otherwise.
 | Secrets | Azure Key Vault | Container Apps Key Vault references |
 | Logs and metrics | Azure Monitor and Log Analytics | Short retention and cost controls |
 | Scheduling | Container Apps KEDA cron and PostgreSQL automation tasks | `America/Toronto` |
-| Infrastructure | Bicep | Deployed through GitHub Actions |
+| Infrastructure | Terraform | Deployed locally first, then through GitHub Actions |
 
 ### Worker
 
@@ -134,7 +135,7 @@ Azure certificate chain; never disable certificate validation.
 - Grant that identity `AcrPull` on the container registry.
 - Grant it access only to the required Key Vault secrets.
 - Store the PostgreSQL password or complete connection string in Key Vault.
-- Do not place production credentials in Bicep parameter files, GitHub variables,
+- Do not place production credentials in Terraform variable files, GitHub variables,
   application settings committed to the repository, or container images.
 - Use GitHub Actions OpenID Connect federation for Azure deployments instead of a
   long-lived service-principal secret.
@@ -158,7 +159,7 @@ deployment order should be:
 8. Enable and verify the worker and database schedules.
 9. Trigger a controlled shutdown and startup cycle before relying on the automation.
 
-Infrastructure definitions should be idempotent Bicep modules. Application deployments
+Infrastructure definitions should be idempotent Terraform modules. Application deployments
 should use immutable image tags based on the Git commit SHA rather than `latest`.
 
 ## Migrations and startup
@@ -196,7 +197,7 @@ the worker's compute cost.
 
 ## Initial cost expectation
 
-The following is an order-of-magnitude estimate in USD for Canada Central and must be
+The following is an order-of-magnitude estimate in USD for the Canadian regions and must be
 rechecked in the Azure Pricing Calculator before deployment:
 
 | Resource | Approximate monthly cost |

@@ -6,6 +6,7 @@ describe('formatWindow', () => {
     const result = formatWindow(
       '2026-05-19T00:00:00Z',
       '2026-08-19T00:00:00Z',
+      'en',
     )
 
     expect(result).toContain('2026')

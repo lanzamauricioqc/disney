@@ -4,12 +4,15 @@ import type {
   DailyWaitTime,
   WeekdayWaitTimePattern,
 } from '../../api/contracts'
+import type { Locale, Translate } from '../../i18n'
 
 const parkColors = ['#146c70', '#b25e09', '#6941c6', '#c4320a', '#1570ef']
 
 export function createDailyParkChartOption(
   weekStart: string,
   parks: DailyParkWaitTime[],
+  locale: Locale,
+  t: Translate,
 ): EChartsCoreOption {
   const dates = Array.from({ length: 7 }, (_, dayOffset) =>
     addDays(weekStart, dayOffset),
@@ -29,7 +32,7 @@ export function createDailyParkChartOption(
           ? parkName
           : `${parkName} (#${parkId})`,
     }))
-    .sort((left, right) => left.name.localeCompare(right.name))
+    .sort((left, right) => left.name.localeCompare(right.name, locale))
   const pointLookup = new Map(
     parks.map((point) => [`${point.parkId}:${point.localDate}`, point]),
   )
@@ -54,7 +57,7 @@ export function createDailyParkChartOption(
         if (!date) {
           return ''
         }
-        const heading = formatChartDate(date, {
+        const heading = formatChartDate(date, locale, {
           weekday: 'long',
           month: 'short',
           day: 'numeric',
@@ -63,9 +66,9 @@ export function createDailyParkChartOption(
           .filter((point) => point.value !== null)
           .map((point) => {
             const detail = pointLookup.get(`${point.seriesId}:${date}`)
-            return `${point.marker}${point.seriesName}: <strong>${point.value} min</strong>` +
+            return `${point.marker}${point.seriesName}: <strong>${new Intl.NumberFormat(locale).format(point.value!)} ${t('min')}</strong>` +
               (detail
-                ? `<br/><span style="padding-left:14px;color:#d0d5dd">${detail.attractionCount} attractions · ${detail.observationCount} samples</span>`
+                ? `<br/><span style="padding-left:14px;color:#d0d5dd">${t('attractionsCount', { count: new Intl.NumberFormat(locale).format(detail.attractionCount) })} · ${t('samplesCount', { count: new Intl.NumberFormat(locale).format(detail.observationCount) })}</span>`
                 : '')
           })
         return [heading, ...rows].join('<br/>')
@@ -85,17 +88,17 @@ export function createDailyParkChartOption(
       axisLabel: {
         color: '#667085',
         formatter: (value: string) =>
-          formatChartDate(value, { weekday: 'short', month: 'short', day: 'numeric' }),
+          formatChartDate(value, locale, { weekday: 'short', month: 'short', day: 'numeric' }),
       },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: '#d0d5dd' } },
     },
     yAxis: {
       type: 'value',
-      name: 'Average minutes',
+      name: t('averageMinutes'),
       min: 0,
       nameTextStyle: { color: '#667085' },
-      axisLabel: { color: '#667085' },
+      axisLabel: { color: '#667085', formatter: (value: number) => new Intl.NumberFormat(locale).format(value) },
       axisLine: { show: false },
       splitLine: { lineStyle: { color: '#eaecf0' } },
     },
@@ -127,6 +130,8 @@ const dayOrder = [
 
 export function createHistoryChartOption(
   history: DailyWaitTime[],
+  locale: Locale,
+  t: Translate,
 ): EChartsCoreOption {
   const axisStyle = { color: '#667085' }
 
@@ -138,6 +143,13 @@ export function createHistoryChartOption(
       backgroundColor: '#101828',
       borderWidth: 0,
       textStyle: { color: '#ffffff' },
+      formatter: (parameters: unknown) => {
+        const points = parameters as Array<{ axisValue: string; marker: string; seriesName: string; value: number | null }>
+        const date = points[0]?.axisValue
+        if (!date) return ''
+        const rows = points.filter((point) => point.value !== null).map((point) => `${point.marker}${point.seriesName}: <strong>${new Intl.NumberFormat(locale).format(point.value!)} ${t('min')}</strong>`)
+        return [formatChartDate(date, locale, { month: 'short', day: 'numeric', year: 'numeric' }), ...rows].join('<br/>')
+      },
     },
     legend: {
       top: 0,
@@ -150,21 +162,24 @@ export function createHistoryChartOption(
       type: 'category',
       boundaryGap: false,
       data: history.map((point) => point.localDate),
-      axisLabel: axisStyle,
+      axisLabel: {
+        ...axisStyle,
+        formatter: (value: string) => formatChartDate(value, locale, { month: 'short', day: 'numeric' }),
+      },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: '#d0d5dd' } },
     },
     yAxis: {
       type: 'value',
-      name: 'Minutes',
+      name: t('minutes'),
       nameTextStyle: axisStyle,
-      axisLabel: axisStyle,
+      axisLabel: { ...axisStyle, formatter: (value: number) => new Intl.NumberFormat(locale).format(value) },
       axisLine: { show: false },
       splitLine: { lineStyle: { color: '#eaecf0' } },
     },
     series: [
       {
-        name: 'Daily average',
+        name: t('dailyAverage'),
         type: 'line',
         smooth: true,
         showSymbol: false,
@@ -173,7 +188,7 @@ export function createHistoryChartOption(
         areaStyle: { color: 'rgba(20, 108, 112, 0.08)' },
       },
       {
-        name: 'Daily maximum',
+        name: t('dailyMaximum'),
         type: 'line',
         showSymbol: false,
         data: history.map((point) => point.maximumWaitMinutes),
@@ -185,8 +200,12 @@ export function createHistoryChartOption(
 
 export function createPatternChartOption(
   patterns: WeekdayWaitTimePattern[],
+  locale: Locale,
+  t: Translate,
 ): EChartsCoreOption {
+  const localizedDays = [t('sunday'), t('monday'), t('tuesday'), t('wednesday'), t('thursday'), t('friday'), t('saturday')]
   const times = [...new Set(patterns.map(formatPatternTime))].sort()
+  const localizedTimes = times.map((time) => formatChartTime(time, locale))
   const maximumWait = Math.max(
     1,
     ...patterns.map((pattern) => pattern.averageWaitMinutes),
@@ -205,20 +224,20 @@ export function createPatternChartOption(
       textStyle: { color: '#ffffff' },
       formatter: (parameters: unknown) => {
         const value = (parameters as { value: [number, number, number] }).value
-        return `${dayOrder[value[1]]} ${times[value[0]]}<br/><strong>${value[2]} min</strong>`
+        return `${localizedDays[value[1]]} ${localizedTimes[value[0]]}<br/><strong>${new Intl.NumberFormat(locale).format(value[2])} ${t('min')}</strong>`
       },
     },
     grid: { top: 12, right: 22, bottom: 76, left: 78 },
     xAxis: {
       type: 'category',
-      data: times,
+      data: localizedTimes,
       axisLabel: { color: '#667085', interval: Math.max(0, Math.floor(times.length / 8)) },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: '#d0d5dd' } },
     },
     yAxis: {
       type: 'category',
-      data: dayOrder,
+      data: localizedDays,
       axisLabel: { color: '#667085' },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: '#d0d5dd' } },
@@ -231,11 +250,12 @@ export function createPatternChartOption(
       left: 'center',
       bottom: 0,
       textStyle: { color: '#475467' },
+      formatter: (value: number) => new Intl.NumberFormat(locale).format(value),
       inRange: { color: ['#e8f3f2', '#8bc7c3', '#f3c98b', '#c4543d'] },
     },
     series: [
       {
-        name: 'Average wait',
+        name: t('averageWait'),
         type: 'heatmap',
         data,
         emphasis: {
@@ -263,10 +283,16 @@ function addDays(date: string, days: number) {
 
 function formatChartDate(
   date: string,
+  locale: Locale,
   options: Intl.DateTimeFormatOptions,
 ) {
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(locale, {
     ...options,
     timeZone: 'UTC',
   }).format(new Date(`${date}T12:00:00Z`))
+}
+
+function formatChartTime(time: string, locale: Locale) {
+  const [hour, minute] = time.split(':').map(Number)
+  return new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }).format(new Date(Date.UTC(2000, 0, 1, hour, minute)))
 }

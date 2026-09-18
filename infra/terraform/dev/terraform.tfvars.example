@@ -1,0 +1,22 @@
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# Choose a unique lowercase suffix for global Azure resource names.
+name_suffix = "abc123"
+
+# Canada East is Quebec City. Change to canadacentral if availability zones or
+# broader regional service availability become more important.
+location = "canadaeast"
+
+# First apply: create infrastructure, PostgreSQL, Key Vault and ACR.
+deploy_worker = false
+
+# After pushing the image, set both values and apply again.
+worker_image_tag = null
+
+# Enable only after manually verifying a complete worker/database lifecycle.
+enable_database_schedule           = false
+database_start_schedule_start_time = null
+database_stop_schedule_start_time  = null
+
+# Keep false for disposable development environments.
+enable_database_delete_lock = false

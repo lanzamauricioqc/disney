@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiMessage, ErrorState, Loading, PageHeader, Status, errorText } from "../components/Ui";
+import { localizedValue, useI18n } from "../i18n";
 import { post, put, remove } from "../lib/api";
 import { asList, dateText, dateTimeText, text } from "../lib/format";
 import { useApiData } from "../lib/useApiData";
 import type { Entity } from "../types";
 
 export function VisitDetailPage() {
+  const { t, locale, number } = useI18n();
   const { id = "" } = useParams();
   const visit = useApiData<Entity>(`/visits/${id}`);
   const notes = useApiData<unknown>(`/visits/${id}/notes`);
@@ -29,7 +31,7 @@ export function VisitDetailPage() {
       setMessage(success);
       return result;
     } catch (error) {
-      setActionError(errorText(error));
+      setActionError(errorText(error, t));
       return undefined;
     } finally {
       setPending("");
@@ -37,11 +39,11 @@ export function VisitDetailPage() {
   };
 
   if (visit.loading) {
-    return <Loading label="Loading visit" />;
+    return <Loading label={t("Loading visit")} />;
   }
 
   if (visit.error || !visit.data) {
-    return <ErrorState message={visit.error || "Visit was not returned by the API."} retry={visit.refresh} />;
+    return <ErrorState message={visit.error || t("Visit was not returned by the API.")} retry={visit.refresh} />;
   }
 
   const data = visit.data;
@@ -57,7 +59,7 @@ export function VisitDetailPage() {
       () => post<Record<string, unknown>>(`/visits/${id}/access-link`, {
         expiresAt: defaultAccessExpiry(data.visitDate)
       }),
-      "Visitor access link generated. Copy it now; the token is not shown again."
+      t("Visitor access link generated. Copy it now; the token is not shown again.")
     );
     if (!result) {
       return;
@@ -73,7 +75,7 @@ export function VisitDetailPage() {
     const result = await act(
       "entitlement",
       () => post<Entity>(`/visits/${id}/entitlement`, {}),
-      "One company credit assigned to this visit."
+      t("One company credit assigned to this visit.")
     );
     if (result) {
       entitlement.setData(result as Entity);
@@ -90,7 +92,7 @@ export function VisitDetailPage() {
         completedItemCount: Number(form.get("completedItemCount")),
         totalItemCount: Number(form.get("totalItemCount"))
       }),
-      "Visit progress updated."
+      t("Visit progress updated.")
     );
     if (result) {
       void visit.refresh();
@@ -98,33 +100,33 @@ export function VisitDetailPage() {
   };
 
   return <>
-    <Link className="back" to="/visits">All visits</Link>
+    <Link className="back" to="/visits">{t("All visits")}</Link>
     <PageHeader
-      eyebrow="VISIT DETAIL"
-      title={text(data.customerName, "Customer visit")}
-      description={`${dateText(data.visitDate)} - ${text(data.parkName)}`}
+      eyebrow={t("VISIT DETAIL")}
+      title={text(data.customerName, t("Customer visit"))}
+      description={`${dateText(data.visitDate, locale)} - ${text(data.parkName)}`}
       action={<Status value={data.status} />}
     />
     <ApiMessage error={actionError} success={message} />
     <section className="visit-summary">
       <article>
-        <span>ITINERARY PROGRESS</span>
-        <strong>{progress}%</strong>
+        <span>{t("ITINERARY PROGRESS")}</span>
+        <strong>{number(progress)}%</strong>
         <div className="big-progress"><i style={{ width: `${progress}%` }} /></div>
-        <small>{completed} of {total} planned stops</small>
+        <small>{t("{completed} of {total} planned stops", { completed: number(completed), total: number(total) })}</small>
       </article>
-      <article><span>PARTY SIZE</span><strong>{text(data.partySize)}</strong><small>travelers</small></article>
-      <article><span>MEETING POINT</span><strong className="summary-text">{text(data.meetingPoint)}</strong></article>
-      <article><span>TRANSPORTATION</span><strong className="summary-text">{text(data.transportationDetails)}</strong></article>
+      <article><span>{t("PARTY SIZE")}</span><strong>{number(Number(data.partySize ?? 0))}</strong><small>{t("travelers")}</small></article>
+      <article><span>{t("MEETING POINT")}</span><strong className="summary-text">{text(data.meetingPoint)}</strong></article>
+      <article><span>{t("TRANSPORTATION")}</span><strong className="summary-text">{text(data.transportationDetails)}</strong></article>
     </section>
     <div className="detail-grid">
       <div>
         <section className="panel detail-card">
-          <div className="panel-head"><div><span>CUSTOMER-FACING</span><h2>Visitor access</h2></div></div>
+          <div className="panel-head"><div><span>{t("CUSTOMER-FACING")}</span><h2>{t("Visitor access")}</h2></div></div>
           <p>
             {entitlement.data
-              ? "A visit credit is assigned. Generate a high-entropy link and share it only with the intended traveler."
-              : "Assign one purchased visit credit before generating customer access."}
+              ? t("A visit credit is assigned. Generate a high-entropy link and share it only with the intended traveler.")
+              : t("Assign one purchased visit credit before generating customer access.")}
           </p>
           {!entitlement.loading && !entitlement.data ? (
             <button
@@ -132,20 +134,20 @@ export function VisitDetailPage() {
               disabled={pending === "entitlement"}
               onClick={() => void assignEntitlement()}
             >
-              Assign one credit
+              {t("Assign one credit")}
             </button>
           ) : null}
           {accessUrl ? <div className="access-link">
             <code>{accessUrl}</code>
-            <button onClick={() => void navigator.clipboard.writeText(accessUrl)}>Copy</button>
-          </div> : <div className="inline-empty">Access tokens are shown only when generated.</div>}
+            <button onClick={() => void navigator.clipboard.writeText(accessUrl)}>{t("Copy")}</button>
+          </div> : <div className="inline-empty">{t("Access tokens are shown only when generated.")}</div>}
           <div className="button-row">
             <button
               className="btn btn--primary"
               disabled={!entitlement.data || pending === "link"}
               onClick={() => void generateAccessLink()}
             >
-              {accessUrl ? "Generate replacement" : "Generate access link"}
+              {accessUrl ? t("Generate replacement") : t("Generate access link")}
             </button>
             <button
               className="btn btn--danger"
@@ -153,23 +155,23 @@ export function VisitDetailPage() {
               onClick={() => void act(
                 "revoke",
                 () => remove(`/visits/${id}/access-link`),
-                "Active access links revoked."
+                t("Active access links revoked.")
               ).then(() => setAccessUrl(""))}
             >
-              Revoke active links
+              {t("Revoke active links")}
             </button>
           </div>
         </section>
         <section className="panel detail-card">
-          <div className="panel-head"><div><span>CUSTOMER-FACING</span><h2>Visit instructions</h2></div></div>
+          <div className="panel-head"><div><span>{t("CUSTOMER-FACING")}</span><h2>{t("Visit instructions")}</h2></div></div>
           <dl className="details-list">
-            <div><dt>Welcome and special instructions</dt><dd>{text(data.instructions, "No instructions added.")}</dd></div>
-            <div><dt>Meeting point</dt><dd>{text(data.meetingPoint)}</dd></div>
-            <div><dt>Transportation</dt><dd>{text(data.transportationDetails)}</dd></div>
+            <div><dt>{t("Welcome and special instructions")}</dt><dd>{text(data.instructions, t("No instructions added."))}</dd></div>
+            <div><dt>{t("Meeting point")}</dt><dd>{text(data.meetingPoint)}</dd></div>
+            <div><dt>{t("Transportation")}</dt><dd>{text(data.transportationDetails)}</dd></div>
           </dl>
         </section>
         <section className="panel detail-card internal">
-          <div className="panel-head"><div><span>INTERNAL ONLY</span><h2>Itinerary overrides</h2></div></div>
+          <div className="panel-head"><div><span>{t("INTERNAL ONLY")}</span><h2>{t("Itinerary overrides")}</h2></div></div>
           <form className="inline-form" onSubmit={async event => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -182,31 +184,31 @@ export function VisitDetailPage() {
                 summary: instruction,
                 detailsJson: JSON.stringify({ instruction, reason })
               }),
-              "Override recorded."
+              t("Override recorded.")
             );
             if (result) {
               form.reset();
               void overrides.refresh();
             }
           }}>
-            <label>Adjustment instruction<textarea name="instruction" rows={2} required /></label>
-            <label>Operational reason<input name="reason" required /></label>
-            <button className="btn btn--primary" disabled={pending === "override"}>Record override</button>
+            <label>{t("Adjustment instruction")}<textarea name="instruction" rows={2} required /></label>
+            <label>{t("Operational reason")}<input name="reason" required /></label>
+            <button className="btn btn--primary" disabled={pending === "override"}>{t("Record override")}</button>
           </form>
           {overrides.loading ? <Loading /> : overrideItems.length ? (
             <ul className="record-list">{overrideItems.map((item, index) => (
               <li key={text(item.id, String(index))}>
                 <strong>{text(item.summary)}</strong>
                 <span>{text(item.detailsJson)}</span>
-                <time>{dateTimeText(item.createdAt)}</time>
+                <time>{dateTimeText(item.createdAt, locale)}</time>
               </li>
             ))}</ul>
-          ) : <div className="inline-empty">No itinerary overrides recorded.</div>}
+          ) : <div className="inline-empty">{t("No itinerary overrides recorded.")}</div>}
         </section>
       </div>
       <aside>
         <section className="panel detail-card internal">
-          <div className="panel-head"><div><span>INTERNAL ONLY</span><h2>Team notes</h2></div></div>
+          <div className="panel-head"><div><span>{t("INTERNAL ONLY")}</span><h2>{t("Team notes")}</h2></div></div>
           <form className="note-form" onSubmit={async event => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -214,37 +216,37 @@ export function VisitDetailPage() {
             const result = await act(
               "note",
               () => post(`/visits/${id}/notes`, { note: value.get("note") }),
-              "Internal note added."
+              t("Internal note added.")
             );
             if (result) {
               form.reset();
               void notes.refresh();
             }
           }}>
-            <label>Add a note<textarea name="note" rows={3} required placeholder="Visible only to authorized staff" /></label>
-            <button className="btn btn--secondary" disabled={pending === "note"}>Add internal note</button>
+            <label>{t("Add a note")}<textarea name="note" rows={3} required placeholder={t("Visible only to authorized staff")} /></label>
+            <button className="btn btn--secondary" disabled={pending === "note"}>{t("Add internal note")}</button>
           </form>
           {notes.loading ? <Loading /> : noteItems.length ? (
             <ul className="notes-list">{noteItems.map((note, index) => (
               <li key={text(note.id, String(index))}>
                 <p>{text(note.note)}</p>
-                <span>{dateTimeText(note.createdAt)}</span>
+                <span>{dateTimeText(note.createdAt, locale)}</span>
               </li>
             ))}</ul>
-          ) : <div className="inline-empty">No internal notes recorded.</div>}
+          ) : <div className="inline-empty">{t("No internal notes recorded.")}</div>}
         </section>
         <section className="panel detail-card">
-          <div className="panel-head"><div><span>VISIT STATUS</span><h2>Progress</h2></div></div>
+          <div className="panel-head"><div><span>{t("VISIT STATUS")}</span><h2>{t("Progress")}</h2></div></div>
           <form className="form-stack" onSubmit={updateProgress}>
-            <label>Status<select name="status" defaultValue={text(data.status, "Planned")}>
-              <option value="Planned">Planned</option>
-              <option value="Active">Active</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
+            <label>{t("Status")}<select name="status" defaultValue={text(data.status, "Planned")}>
+              <option value="Planned">{localizedValue("Planned", t)}</option>
+              <option value="Active">{localizedValue("Active", t)}</option>
+              <option value="Completed">{localizedValue("Completed", t)}</option>
+              <option value="Cancelled">{localizedValue("Cancelled", t)}</option>
             </select></label>
-            <label>Completed items<input name="completedItemCount" type="number" min="0" defaultValue={completed} required /></label>
-            <label>Total items<input name="totalItemCount" type="number" min="0" defaultValue={total} required /></label>
-            <button className="btn btn--secondary" disabled={pending === "progress"}>Update progress</button>
+            <label>{t("Completed items")}<input name="completedItemCount" type="number" min="0" defaultValue={completed} required /></label>
+            <label>{t("Total items")}<input name="totalItemCount" type="number" min="0" defaultValue={total} required /></label>
+            <button className="btn btn--secondary" disabled={pending === "progress"}>{t("Update progress")}</button>
           </form>
         </section>
       </aside>
