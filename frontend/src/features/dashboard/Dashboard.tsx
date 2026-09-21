@@ -146,7 +146,8 @@ export function Dashboard() {
         </a>
         <div className="topbar-actions">
           <LanguageSelector />
-          <Link className="topbar-link" to="/admin">{t('administration')}</Link>
+          <Link className="topbar-link plan-visit-link" to="/visit">{t('planVisit')}</Link>
+          <Link className="topbar-link dashboard-admin-link" to="/admin">{t('administration')}</Link>
           <div className="topbar-status">
             <span className="status-dot" aria-hidden="true" />
             {t('serviceOnline')}

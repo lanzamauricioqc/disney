@@ -354,25 +354,25 @@ The visitor must be able to describe the visit before an itinerary can be genera
 
 ## User Stories
 
-### [MVP REQUIRED] Story 4.1 — Select visit date
+### [DONE] [MVP REQUIRED] Story 4.1 — Select visit date
 
 As a visitor,  
 I want to select the date of my park visit,  
 so that the system can generate a plan for the correct day.
 
-### [MVP REQUIRED] Story 4.2 — Select arrival time
+### [DONE] [MVP REQUIRED] Story 4.2 — Select arrival time
 
 As a visitor,  
 I want to specify when I expect to arrive,  
 so that the itinerary starts at the appropriate time.
 
-### [MVP REQUIRED] Story 4.3 — Select departure time
+### [DONE] [MVP REQUIRED] Story 4.3 — Select departure time
 
 As a visitor,  
 I want to specify when I expect to leave,  
 so that the itinerary does not schedule activities after my visit ends.
 
-### [MVP REQUIRED] Story 4.4 — Specify party size
+### [DONE] [MVP REQUIRED] Story 4.4 — Specify party size
 
 As a visitor,  
 I want to specify how many people are in my group,  
@@ -668,19 +668,19 @@ Current wait times are useful, but future wait-time prediction allows the optimi
 
 ## User Stories
 
-### Story 12.1 — Predict future wait time
+### [DONE] Story 12.1 — Predict future wait time
 
 As the optimization engine,  
 I want to estimate an attraction's wait time later in the day,  
 so that I can determine whether visiting now or later is better.
 
-### Story 12.2 — Prediction confidence
+### [DONE] Story 12.2 — Prediction confidence
 
 As the optimization engine,  
 I want each prediction to include a confidence measure,  
 so that uncertain predictions influence recommendations appropriately.
 
-### Story 12.3 — Use historical patterns
+### [DONE] Story 12.3 — Use historical patterns
 
 As the prediction engine,  
 I want historical queue patterns included in forecasts,  

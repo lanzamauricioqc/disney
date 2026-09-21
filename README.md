@@ -34,6 +34,7 @@ GET /api/v1/parks/{parkId}/analytics/wait-times/history?attractionId={attraction
 GET /api/v1/parks/{parkId}/analytics/wait-times/daily?attractionId={attractionId}
 GET /api/v1/parks/{parkId}/analytics/wait-times/weekday-quarter-hourly
 GET /api/v1/parks/{parkId}/analytics/closures/weekday-quarter-hourly
+GET /api/v1/parks/{parkId}/attractions/{attractionId}/wait-time-prediction?at={timestamp}
 POST /api/v1/waitlist
 GET /api/v1/billing/products
 POST /api/v1/billing/checkout-sessions
@@ -52,6 +53,12 @@ POST /api/v1/company/integrations/reservations
 
 Historical observation queries use an inclusive `from`, exclusive `to`, and a maximum
 31-day range. Timestamps must include an offset.
+
+Wait-time predictions accept a future offset-bearing timestamp up to 24 hours ahead.
+They use the median of valid, open observations from the matching park-local weekday
+and 15-minute slot during the trailing three months. Available predictions include a
+confidence score from 0 to 1 based on historical sample volume and consistency around
+the median. Results explicitly identify when there is insufficient historical data.
 
 The analytics endpoints group local park time into 15-minute buckets and return
 `localHour` and `localMinute`. They accept an optional `attractionId` query parameter.

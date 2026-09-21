@@ -224,6 +224,30 @@ public sealed class InfrastructureTests
         Assert.Contains("WHERE park.is_active", analyticsReaderSourceCode);
     }
 
+    [Fact]
+    public void PredictionReader_UsesParkLocalHistoricalObservations()
+    {
+        var predictionReaderPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Disney.Infrastructure",
+            "PostgreSqlQueuePredictionReader.cs");
+        var predictionReaderSourceCode =
+            File.ReadAllText(Path.GetFullPath(predictionReaderPath));
+
+        Assert.Contains("@TargetAt AT TIME ZONE park.timezone", predictionReaderSourceCode);
+        Assert.Contains("observation.is_valid", predictionReaderSourceCode);
+        Assert.Contains("observation.is_open", predictionReaderSourceCode);
+        Assert.Contains("observation.wait_minutes IS NOT NULL", predictionReaderSourceCode);
+        Assert.Contains("observation.observed_at >= @WindowStart", predictionReaderSourceCode);
+        Assert.Contains("observation.observed_at < @WindowEnd", predictionReaderSourceCode);
+        Assert.Contains("observation.observed_day_of_week", predictionReaderSourceCode);
+        Assert.Contains("observation.observed_slot_minutes / 15", predictionReaderSourceCode);
+    }
+
     private sealed class StubHandler(HttpStatusCode statusCode, string content)
         : HttpMessageHandler
     {

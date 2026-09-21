@@ -279,6 +279,149 @@ public sealed class ApplicationTests
                 CancellationToken.None));
     }
 
+    [Fact]
+    public async Task PredictionService_UsesHistoricalMedianForTargetWindow()
+    {
+        var currentTime = new DateTimeOffset(2026, 9, 18, 14, 0, 0, TimeSpan.Zero);
+        var predictionReader = new FakeQueuePredictionReader(
+            new QueuePredictionData(20, "Space Mountain", [15, 30, 45, 60]));
+        var service = new QueuePredictionService(
+            predictionReader,
+            new FixedTimeProvider(currentTime));
+        var targetAt = currentTime.AddHours(2);
+
+        var result = await service.PredictWaitTimeAsync(
+            1,
+            20,
+            targetAt,
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(WaitTimePredictionStatus.Available, result.Status);
+        Assert.Equal((short)38, result.PredictedWaitMinutes);
+        Assert.Equal(0.20m, result.ConfidenceScore);
+        Assert.Equal(4, result.HistoricalSampleCount);
+        Assert.Equal("weekday-quarter-hour-median-v1", result.AlgorithmVersion);
+        Assert.Equal(currentTime.AddMonths(-3), predictionReader.WindowStart);
+        Assert.Equal(currentTime, predictionReader.WindowEnd);
+        Assert.Equal(targetAt, predictionReader.TargetAt);
+    }
+
+    [Fact]
+    public async Task PredictionService_ReportsInsufficientHistoricalData()
+    {
+        var currentTime = new DateTimeOffset(2026, 9, 18, 14, 0, 0, TimeSpan.Zero);
+        var service = new QueuePredictionService(
+            new FakeQueuePredictionReader(
+                new QueuePredictionData(20, "Space Mountain", [25, 30])),
+            new FixedTimeProvider(currentTime));
+
+        var result = await service.PredictWaitTimeAsync(
+            1,
+            20,
+            currentTime.AddHours(1),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(WaitTimePredictionStatus.InsufficientHistoricalData, result.Status);
+        Assert.Null(result.PredictedWaitMinutes);
+        Assert.Null(result.ConfidenceScore);
+        Assert.Equal(2, result.HistoricalSampleCount);
+    }
+
+    [Fact]
+    public async Task PredictionService_ReportsFullConfidenceForConsistentHistory()
+    {
+        var currentTime = new DateTimeOffset(2026, 9, 18, 14, 0, 0, TimeSpan.Zero);
+        var service = new QueuePredictionService(
+            new FakeQueuePredictionReader(
+                new QueuePredictionData(
+                    20,
+                    "Space Mountain",
+                    Enumerable.Repeat((short)30, 12).ToArray())),
+            new FixedTimeProvider(currentTime));
+
+        var result = await service.PredictWaitTimeAsync(
+            1,
+            20,
+            currentTime.AddHours(1),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(1m, result.ConfidenceScore);
+    }
+
+    [Fact]
+    public async Task PredictionService_ReportsZeroConfidenceForHighlyVariableHistory()
+    {
+        var currentTime = new DateTimeOffset(2026, 9, 18, 14, 0, 0, TimeSpan.Zero);
+        var service = new QueuePredictionService(
+            new FakeQueuePredictionReader(
+                new QueuePredictionData(20, "Space Mountain", [0, 0, 180])),
+            new FixedTimeProvider(currentTime));
+
+        var result = await service.PredictWaitTimeAsync(
+            1,
+            20,
+            currentTime.AddHours(1),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(0m, result.ConfidenceScore);
+    }
+
+    [Fact]
+    public async Task PredictionService_ReturnsNullForUnknownAttraction()
+    {
+        var currentTime = new DateTimeOffset(2026, 9, 18, 14, 0, 0, TimeSpan.Zero);
+        var service = new QueuePredictionService(
+            new FakeQueuePredictionReader(null),
+            new FixedTimeProvider(currentTime));
+
+        var result = await service.PredictWaitTimeAsync(
+            1,
+            20,
+            currentTime.AddHours(1),
+            CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task PredictionService_RejectsInvalidRequests()
+    {
+        var currentTime = new DateTimeOffset(2026, 9, 18, 14, 0, 0, TimeSpan.Zero);
+        var service = new QueuePredictionService(
+            new FakeQueuePredictionReader(null),
+            new FixedTimeProvider(currentTime));
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.PredictWaitTimeAsync(
+                0,
+                20,
+                currentTime.AddHours(1),
+                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.PredictWaitTimeAsync(
+                1,
+                0,
+                currentTime.AddHours(1),
+                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.PredictWaitTimeAsync(
+                1,
+                20,
+                currentTime,
+                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.PredictWaitTimeAsync(
+                1,
+                20,
+                currentTime.Add(QueuePredictionService.MaximumPredictionHorizon)
+                    .AddMinutes(1),
+                CancellationToken.None));
+    }
+
     private static Park CreatePark(
         long id = 1,
         int sourceId = 6,
@@ -440,6 +583,28 @@ public sealed class ApplicationTests
             DateTimeOffset to,
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<WeekdayClosurePattern>>([]);
+    }
+
+    private sealed class FakeQueuePredictionReader(QueuePredictionData? predictionData)
+        : IQueuePredictionReader
+    {
+        public DateTimeOffset? TargetAt { get; private set; }
+        public DateTimeOffset? WindowStart { get; private set; }
+        public DateTimeOffset? WindowEnd { get; private set; }
+
+        public Task<QueuePredictionData?> GetPredictionDataAsync(
+            long parkId,
+            long attractionId,
+            DateTimeOffset targetAt,
+            DateTimeOffset windowStart,
+            DateTimeOffset windowEnd,
+            CancellationToken cancellationToken)
+        {
+            TargetAt = targetAt;
+            WindowStart = windowStart;
+            WindowEnd = windowEnd;
+            return Task.FromResult(predictionData);
+        }
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
