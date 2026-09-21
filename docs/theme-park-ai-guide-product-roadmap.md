@@ -434,7 +434,7 @@ As the system,
 I want to store attraction coordinates,  
 so that distances between attractions can be calculated.
 
-### [MVP REQUIRED] Story 6.2 — Estimate walking time
+### [DONE] [MVP REQUIRED] Story 6.2 — Estimate walking time
 
 As the optimization engine,  
 I want to estimate walking time between attractions,  

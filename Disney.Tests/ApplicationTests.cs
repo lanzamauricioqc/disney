@@ -422,6 +422,102 @@ public sealed class ApplicationTests
                 CancellationToken.None));
     }
 
+    [Fact]
+    public async Task WalkingTimeService_EstimatesRouteDistanceAndDuration()
+    {
+        var service = new WalkingTimeService(new FakeWalkingTimeReader(
+            new WalkingTimeData(
+                10,
+                "Origin",
+                0m,
+                0m,
+                20,
+                "Destination",
+                0m,
+                0.008993m)));
+
+        var result = await service.EstimateAsync(1, 10, 20, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(WalkingTimeEstimateStatus.Available, result.Status);
+        Assert.InRange(result.DirectDistanceMeters!.Value, 999, 1001);
+        Assert.InRange(result.EstimatedRouteDistanceMeters!.Value, 1249, 1251);
+        Assert.Equal(15, result.EstimatedWalkingMinutes);
+        Assert.Equal(1.25m, result.RouteDistanceMultiplier);
+        Assert.Equal(1.4m, result.WalkingSpeedMetersPerSecond);
+        Assert.Equal("haversine-route-factor-v1", result.AlgorithmVersion);
+    }
+
+    [Fact]
+    public async Task WalkingTimeService_ReportsUnavailableCoordinates()
+    {
+        var service = new WalkingTimeService(new FakeWalkingTimeReader(
+            new WalkingTimeData(
+                10,
+                "Origin",
+                null,
+                null,
+                20,
+                "Destination",
+                28.4m,
+                -81.5m)));
+
+        var result = await service.EstimateAsync(1, 10, 20, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(WalkingTimeEstimateStatus.CoordinatesUnavailable, result.Status);
+        Assert.Null(result.DirectDistanceMeters);
+        Assert.Null(result.EstimatedRouteDistanceMeters);
+        Assert.Null(result.EstimatedWalkingMinutes);
+    }
+
+    [Fact]
+    public async Task WalkingTimeService_ReturnsNullForUnknownAttraction()
+    {
+        var service = new WalkingTimeService(new FakeWalkingTimeReader(null));
+
+        var result = await service.EstimateAsync(1, 10, 20, CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task WalkingTimeService_RejectsInvalidIdentifiers()
+    {
+        var service = new WalkingTimeService(new FakeWalkingTimeReader(null));
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.EstimateAsync(0, 10, 20, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.EstimateAsync(1, 0, 20, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.EstimateAsync(1, 10, 0, CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData(-91, 0)]
+    [InlineData(91, 0)]
+    [InlineData(0, -181)]
+    [InlineData(0, 181)]
+    public void GeoCoordinate_RejectsValuesOutsideGeographicBounds(
+        int latitude,
+        int longitude)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new GeoCoordinate(latitude, longitude));
+    }
+
+    [Fact]
+    public void GeoCoordinate_CalculatesAntipodalDistance()
+    {
+        var origin = new GeoCoordinate(45m, 0m);
+        var destination = new GeoCoordinate(-45m, 180m);
+
+        var distance = origin.DistanceToMeters(destination);
+
+        Assert.InRange(distance, 20_015_000, 20_016_000);
+    }
+
     private static Park CreatePark(
         long id = 1,
         int sourceId = 6,
@@ -605,6 +701,18 @@ public sealed class ApplicationTests
             WindowEnd = windowEnd;
             return Task.FromResult(predictionData);
         }
+
+    }
+
+    private sealed class FakeWalkingTimeReader(WalkingTimeData? data)
+        : IWalkingTimeReader
+    {
+        public Task<WalkingTimeData?> GetWalkingTimeDataAsync(
+            long parkId,
+            long fromAttractionId,
+            long toAttractionId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(data);
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider

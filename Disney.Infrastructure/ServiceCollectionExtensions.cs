@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IQueueCollectionStore, PostgreSqlQueueCollectionStore>();
         services.AddScoped<IQueueAnalyticsReader, PostgreSqlQueueAnalyticsReader>();
         services.AddScoped<IQueuePredictionReader, PostgreSqlQueuePredictionReader>();
+        services.AddScoped<IWalkingTimeReader, PostgreSqlWalkingTimeReader>();
         services.AddScoped<IAdminRepository, PostgreSqlAdminRepository>();
         services.AddScoped<IWaitlistRepository, PostgreSqlCommercialRepository>();
         services.AddScoped<ICommercialRepository, PostgreSqlCommercialRepository>();

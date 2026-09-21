@@ -252,6 +252,29 @@ public sealed class InfrastructureTests
         Assert.Contains("observation.observed_slot_minutes / 15", predictionReaderSourceCode);
     }
 
+    [Fact]
+    public void WalkingTimeReader_RequiresActiveAttractionsInTheSamePark()
+    {
+        var readerPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Disney.Infrastructure",
+            "PostgreSqlWalkingTimeReader.cs");
+        var readerSourceCode = File.ReadAllText(Path.GetFullPath(readerPath));
+
+        Assert.Contains(
+            "destination.park_id = origin.park_id",
+            readerSourceCode);
+        Assert.Contains("park.id = @ParkId", readerSourceCode);
+        Assert.Contains("origin.is_active", readerSourceCode);
+        Assert.Contains("destination.is_active", readerSourceCode);
+        Assert.Contains("origin.latitude AS FromLatitude", readerSourceCode);
+        Assert.Contains("destination.longitude AS ToLongitude", readerSourceCode);
+    }
+
     private sealed class StubHandler(HttpStatusCode statusCode, string content)
         : HttpMessageHandler
     {

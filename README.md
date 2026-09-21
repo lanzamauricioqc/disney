@@ -35,6 +35,7 @@ GET /api/v1/parks/{parkId}/analytics/wait-times/daily?attractionId={attractionId
 GET /api/v1/parks/{parkId}/analytics/wait-times/weekday-quarter-hourly
 GET /api/v1/parks/{parkId}/analytics/closures/weekday-quarter-hourly
 GET /api/v1/parks/{parkId}/attractions/{attractionId}/wait-time-prediction?at={timestamp}
+GET /api/v1/parks/{parkId}/walking-time?fromAttractionId={id}&toAttractionId={id}
 POST /api/v1/waitlist
 GET /api/v1/billing/products
 POST /api/v1/billing/checkout-sessions
@@ -59,6 +60,11 @@ They use the median of valid, open observations from the matching park-local wee
 and 15-minute slot during the trailing three months. Available predictions include a
 confidence score from 0 to 1 based on historical sample volume and consistency around
 the median. Results explicitly identify when there is insufficient historical data.
+
+Walking-time estimates use attraction coordinates, Haversine distance, a 1.25 route
+distance multiplier, and a 1.4 m/s walking speed. Results explicitly identify when
+either attraction lacks coordinates. A future park graph will replace the route
+distance approximation.
 
 The analytics endpoints group local park time into 15-minute buckets and return
 `localHour` and `localMinute`. They accept an optional `attractionId` query parameter.

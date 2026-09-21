@@ -122,6 +122,7 @@ builder.Services.AddSingleton<ICompanyTokenService, CompanyJwtTokenService>();
 builder.Services.AddScoped<CompanyService>();
 builder.Services.AddScoped<IQueueAnalyticsService, QueueAnalyticsService>();
 builder.Services.AddScoped<IQueuePredictionService, QueuePredictionService>();
+builder.Services.AddScoped<IWalkingTimeService, WalkingTimeService>();
 builder.Services.AddScoped<IQueueCollectionService, QueueCollectionService>();
 builder.Services.AddScoped<WaitlistService>();
 builder.Services.AddScoped<CheckoutService>();
@@ -172,6 +173,7 @@ application.MapHealthChecks("/health/dependencies/queue-times", new HealthCheckO
 application.MapParkEndpoints();
 application.MapQueueAnalyticsEndpoints();
 application.MapQueuePredictionEndpoints();
+application.MapWalkingTimeEndpoints();
 application.MapAdminEndpoints();
 application.MapCommercialEndpoints();
 application.MapCompanyEndpoints();
