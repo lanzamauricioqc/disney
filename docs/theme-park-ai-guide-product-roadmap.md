@@ -428,7 +428,7 @@ The optimizer needs a model of physical movement through the park.
 
 ## User Stories
 
-### [MVP REQUIRED] Story 6.1 — Store attraction coordinates
+### [DONE] [MVP REQUIRED] Story 6.1 — Store attraction coordinates
 
 As the system,  
 I want to store attraction coordinates,  

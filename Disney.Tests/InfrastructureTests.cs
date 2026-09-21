@@ -94,6 +94,10 @@ public sealed class InfrastructureTests
         Assert.Contains("observed_slot_minutes smallint NOT NULL", migrationSql);
         Assert.Contains("USING brin (observed_at)", migrationSql);
         Assert.Contains("duration_minutes", migrationSql);
+        Assert.Contains("latitude numeric(9,6)", migrationSql);
+        Assert.Contains("longitude numeric(9,6)", migrationSql);
+        Assert.Contains("latitude BETWEEN -90 AND 90", migrationSql);
+        Assert.Contains("longitude BETWEEN -180 AND 180", migrationSql);
         Assert.DoesNotContain("IF NOT EXISTS public.parks", migrationSql);
         Assert.DoesNotContain("source_last_updated", migrationSql);
         Assert.DoesNotContain(
