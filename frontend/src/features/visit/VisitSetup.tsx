@@ -1,5 +1,5 @@
-import { useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { LanguageSelector, useI18n, type TranslationKey } from '../../i18n'
 import {
   MAX_PARTY_SIZE,
@@ -55,6 +55,7 @@ function initialValues(savedDetails: VisitDetails | null): VisitSetupValues {
 
 export function VisitSetup({ savedDetails, onContinue }: VisitSetupProps) {
   const { locale, t } = useI18n()
+  const navigate = useNavigate()
   const readyHeadingRef = useRef<HTMLHeadingElement>(null)
   const [values, setValues] = useState<VisitSetupValues>(() => initialValues(savedDetails))
   const [errors, setErrors] = useState<VisitSetupErrors>({})
@@ -62,6 +63,10 @@ export function VisitSetup({ savedDetails, onContinue }: VisitSetupProps) {
   const [confirmed, setConfirmed] = useState(savedDetails !== null)
   const minDate = toLocalDateInputValue(new Date())
   const details = confirmed ? toVisitDetails(values) : null
+
+  useEffect(() => {
+    if (savedDetails) readyHeadingRef.current?.focus()
+  }, [savedDetails])
 
   const messageFor = (field: VisitSetupField) => {
     const error = errors[field]
@@ -88,8 +93,7 @@ export function VisitSetup({ savedDetails, onContinue }: VisitSetupProps) {
     }
 
     onContinue(toVisitDetails(values))
-    setConfirmed(true)
-    requestAnimationFrame(() => readyHeadingRef.current?.focus())
+    navigate('/visit/priorities')
   }
 
   const adjustPartySize = (change: number) => {
@@ -158,8 +162,11 @@ export function VisitSetup({ savedDetails, onContinue }: VisitSetupProps) {
               </div>
             </dl>
             <div className="visit-actions">
+              <Link className="primary-button visit-primary-button button-link" to="/visit/priorities">
+                {t('chooseAttractionPriorities')}<span aria-hidden="true">→</span>
+              </Link>
               <button
-                className="primary-button visit-primary-button"
+                className="secondary-button button-link"
                 onClick={() => {
                   setConfirmed(false)
                   requestAnimationFrame(() => document.getElementById('visit-date')?.focus())
@@ -168,7 +175,6 @@ export function VisitSetup({ savedDetails, onContinue }: VisitSetupProps) {
               >
                 {t('editVisitDetails')}
               </button>
-              <Link className="secondary-button button-link" to="/">{t('viewLiveWaitTimes')}</Link>
             </div>
           </section>
         ) : (
@@ -293,7 +299,7 @@ export function VisitSetup({ savedDetails, onContinue }: VisitSetupProps) {
               <div className="visit-form-footer">
                 <p><span aria-hidden="true">●</span>{t('visitNotSaved')}</p>
                 <button className="primary-button visit-primary-button" type="submit">
-                  {t('continuePlanning')}<span aria-hidden="true">→</span>
+                  {t('continueToPriorities')}<span aria-hidden="true">→</span>
                 </button>
               </div>
             </form>

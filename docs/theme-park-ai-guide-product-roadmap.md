@@ -394,25 +394,25 @@ Visitors must communicate which attractions matter most.
 
 ## User Stories
 
-### [MVP REQUIRED] Story 5.1 — Mark attractions as Must Do
+### [DONE] [MVP REQUIRED] Story 5.1 — Mark attractions as Must Do
 
 As a visitor,  
 I want to mark attractions as Must Do,  
 so that the itinerary prioritizes completing them.
 
-### [MVP REQUIRED] Story 5.2 — Mark attractions as Would Like
+### [DONE] [MVP REQUIRED] Story 5.2 — Mark attractions as Would Like
 
 As a visitor,  
 I want to mark attractions as Would Like,  
 so that the optimizer includes them when practical.
 
-### [MVP REQUIRED] Story 5.3 — Mark attractions as Skip
+### [DONE] [MVP REQUIRED] Story 5.3 — Mark attractions as Skip
 
 As a visitor,  
 I want to mark attractions as Skip,  
 so that they are excluded from the itinerary.
 
-### Story 5.4 — Recommend unselected attractions
+### [DONE] Story 5.4 — Recommend unselected attractions
 
 As a visitor,  
 I want the system to suggest attractions I did not select,  
@@ -660,45 +660,8 @@ so that it behaves similarly to a native application.
 
 ---
 
-# Feature 12 — Queue-Time Prediction
-**Priority: P1**  
-**MVP: NO**
-
-Current wait times are useful, but future wait-time prediction allows the optimizer to make much better decisions.
-
-## User Stories
-
-### [DONE] Story 12.1 — Predict future wait time
-
-As the optimization engine,  
-I want to estimate an attraction's wait time later in the day,  
-so that I can determine whether visiting now or later is better.
-
-### [DONE] Story 12.2 — Prediction confidence
-
-As the optimization engine,  
-I want each prediction to include a confidence measure,  
-so that uncertain predictions influence recommendations appropriately.
-
-### [DONE] Story 12.3 — Use historical patterns
-
-As the prediction engine,  
-I want historical queue patterns included in forecasts,  
-so that predictions reflect typical attraction behavior.
-
-### Story 12.4 — Incorporate current conditions
-
-As the prediction engine,  
-I want current queue observations included in forecasts,  
-so that predictions respond to unusual conditions.
-
-### Story 12.5 — Prediction accuracy monitoring
-
-As a system administrator,  
-I want predicted waits compared with actual waits,  
-so that forecast quality can be measured.
-
----
+> **Feature 12 — Queue-Time Prediction** is tracked in the
+> [Future Roadmap](theme-park-ai-guide-future-roadmap.md).
 
 # Feature 13 — Recommendation Explanations
 **Priority: P1**  
@@ -1374,12 +1337,14 @@ Automatically receive updated itinerary
 
 ## Phase 4 — Make the Optimizer Smarter
 
-12. Feature 12 — Queue-Time Prediction
 13. Feature 13 — Recommendation Explanations
 14. Feature 14 — Completion Probability and Plan Risk
 15. Feature 15 — Optimization Modes
 16. Feature 16 — Breaks, Meals, and Visitor Constraints
 17. Feature 17 — Personalized Walking Model
+
+Feature 12 — Queue-Time Prediction is deferred to the
+[Future Roadmap](theme-park-ai-guide-future-roadmap.md).
 
 Goal:
 
