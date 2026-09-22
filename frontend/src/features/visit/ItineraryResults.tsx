@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { useMutation } from '@tanstack/react-query'
+import { Link, useNavigate } from 'react-router-dom'
+import { startVisitSession } from '../../api/client'
 import type {
   ItineraryPreference,
   UnscheduledItineraryReason,
 } from '../../api/contracts'
 import { LanguageSelector, useI18n, type TranslationKey } from '../../i18n'
 import { orderItineraryStops, type GeneratedItinerary } from './itineraryModel'
+import { saveVisitSessionId } from './visitSessionModel'
 
 interface ItineraryResultsProps {
   plan: GeneratedItinerary
@@ -22,8 +25,19 @@ const reasonKeys: Record<UnscheduledItineraryReason, TranslationKey> = {
 export function ItineraryResults({ plan }: ItineraryResultsProps) {
   const { itinerary, park, attractionNames } = plan
   const { locale, t } = useI18n()
+  const navigate = useNavigate()
   const headingRef = useRef<HTMLHeadingElement>(null)
   const stops = useMemo(() => orderItineraryStops(itinerary.stops), [itinerary.stops])
+  const startSession = useMutation({
+    mutationFn: () => startVisitSession(park.id, {
+      partySize: plan.partySize,
+      itinerary: plan.request,
+    }),
+    onSuccess: (session) => {
+      saveVisitSessionId(session.id)
+      navigate('/visit/session')
+    },
+  })
 
   useEffect(() => {
     headingRef.current?.focus()
@@ -192,8 +206,28 @@ export function ItineraryResults({ plan }: ItineraryResultsProps) {
 
         <footer className="itinerary-footer">
           <p>{t('generatedAt', { time: formatTime(itinerary.generatedAt) })} · {itinerary.algorithmVersion}</p>
-          <Link className="primary-button button-link" to="/visit/priorities">{t('backToPriorities')}</Link>
+          <div className="itinerary-footer-actions">
+            <Link className="secondary-button button-link" to="/visit/priorities">
+              {t('backToPriorities')}
+            </Link>
+            <button
+              className="primary-button"
+              disabled={stops.length === 0 || startSession.isPending}
+              onClick={() => startSession.mutate()}
+              type="button"
+            >
+              {startSession.isPending ? t('startingVisit') : t('startVisit')}
+            </button>
+          </div>
         </footer>
+        {startSession.isError && (
+          <div className="itinerary-generation-error" role="alert">
+            <div>
+              <strong>{t('visitStartFailed')}</strong>
+              <p>{startSession.error.message}</p>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

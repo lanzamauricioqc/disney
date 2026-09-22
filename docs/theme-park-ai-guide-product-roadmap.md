@@ -514,25 +514,25 @@ The system must know what has already happened during the visit.
 
 ## User Stories
 
-### [MVP REQUIRED] Story 8.1 — Start visit session
+### [DONE] [MVP REQUIRED] Story 8.1 — Start visit session
 
 As a visitor,  
 I want to start my planned visit,  
 so that the system can begin tracking itinerary execution.
 
-### [MVP REQUIRED] Story 8.2 — Mark attraction completed
+### [DONE] [MVP REQUIRED] Story 8.2 — Mark attraction completed
 
 As a visitor,  
 I want to mark an attraction as completed,  
 so that the system knows it no longer needs to recommend it.
 
-### [MVP REQUIRED] Story 8.3 — Skip attraction
+### [DONE] [MVP REQUIRED] Story 8.3 — Skip attraction
 
 As a visitor,  
 I want to skip a planned attraction,  
 so that the remaining itinerary can be adjusted.
 
-### [MVP REQUIRED] Story 8.4 — Persist visit state
+### [DONE] [MVP REQUIRED] Story 8.4 — Persist visit state
 
 As a visitor,  
 I want my visit progress preserved,  

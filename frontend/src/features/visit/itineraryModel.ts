@@ -22,6 +22,8 @@ export interface GeneratedItinerary {
   itinerary: OptimizedItinerary
   park: Park
   attractionNames: Readonly<Record<number, string>>
+  partySize: number
+  request: OptimizeItineraryRequest
 }
 
 const priorityMap: Record<AttractionPriority, ItineraryPreference> = {

@@ -7,6 +7,8 @@ import type {
   CurrentWaitTimesResult,
   OptimizedItinerary,
   OptimizeItineraryRequest,
+  StartVisitSessionRequest,
+  VisitSession,
   DailyParkWaitTimesResult,
   DailyWaitTimeHistoryResult,
   Park,
@@ -88,6 +90,50 @@ export function optimizeItinerary(
       body: JSON.stringify(request),
       signal,
     },
+  )
+}
+
+export function startVisitSession(
+  parkId: number,
+  request: StartVisitSessionRequest,
+  signal?: AbortSignal,
+) {
+  return requestJson<VisitSession>(
+    `/api/v1/parks/${parkId}/visit-sessions`,
+    {
+      method: 'POST',
+      body: JSON.stringify(request),
+      signal,
+    },
+  )
+}
+
+export function getVisitSession(sessionId: string, signal?: AbortSignal) {
+  return getJson<VisitSession>(
+    `/api/v1/visit-sessions/${encodeURIComponent(sessionId)}`,
+    signal,
+  )
+}
+
+export function completeVisitAttraction(
+  sessionId: string,
+  attractionId: number,
+) {
+  return requestJson<VisitSession>(
+    `/api/v1/visit-sessions/${encodeURIComponent(sessionId)}` +
+      `/stops/${attractionId}/complete`,
+    { method: 'POST' },
+  )
+}
+
+export function skipVisitAttraction(
+  sessionId: string,
+  attractionId: number,
+) {
+  return requestJson<VisitSession>(
+    `/api/v1/visit-sessions/${encodeURIComponent(sessionId)}` +
+      `/stops/${attractionId}/skip`,
+    { method: 'POST' },
   )
 }
 

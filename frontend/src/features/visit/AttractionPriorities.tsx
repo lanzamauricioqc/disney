@@ -171,6 +171,8 @@ export function AttractionPriorities({
         itinerary,
         park: submission.park,
         attractionNames: submission.attractionNames,
+        partySize: visitDetails.partySize,
+        request: submission.request,
       })
       navigate('/visit/itinerary')
     },

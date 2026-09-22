@@ -222,3 +222,32 @@ export interface OptimizedItinerary {
   totalAttractionMinutes: number
   algorithmVersion: string
 }
+
+export type VisitSessionStatus = 'Active' | 'Completed'
+export type VisitSessionStopStatus = 'Pending' | 'Completed' | 'Skipped'
+
+export interface VisitSessionStop extends ItineraryStop {
+  status: VisitSessionStopStatus
+  statusChangedAt: string | null
+}
+
+export interface VisitSession {
+  id: string
+  parkId: number
+  visitStartAt: string
+  visitEndAt: string
+  partySize: number
+  startedAt: string
+  updatedAt: string
+  status: VisitSessionStatus
+  stops: VisitSessionStop[]
+  totalWalkingMinutes: number
+  totalQueueMinutes: number
+  totalAttractionMinutes: number
+  algorithmVersion: string
+}
+
+export interface StartVisitSessionRequest {
+  partySize: number
+  itinerary: OptimizeItineraryRequest
+}

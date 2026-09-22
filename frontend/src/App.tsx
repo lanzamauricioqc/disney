@@ -5,6 +5,7 @@ import { Admin } from './features/admin/Admin'
 import { AttractionPriorities } from './features/visit/AttractionPriorities'
 import { ItineraryResults } from './features/visit/ItineraryResults'
 import { VisitSetup } from './features/visit/VisitSetup'
+import { ActiveVisit } from './features/visit/ActiveVisit'
 import {
   updatePriorityForPark,
   type AttractionPriority,
@@ -82,6 +83,7 @@ export default function App() {
           )
         }
       />
+      <Route path="/visit/session" element={<ActiveVisit />} />
       <Route path="/admin" element={<Admin />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
