@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { Dashboard } from './features/dashboard/Dashboard'
 import { Admin } from './features/admin/Admin'
 import { AttractionPriorities } from './features/visit/AttractionPriorities'
+import { ItineraryResults } from './features/visit/ItineraryResults'
 import { VisitSetup } from './features/visit/VisitSetup'
 import {
   updatePriorityForPark,
@@ -10,6 +11,7 @@ import {
   type PrioritySelectionsByPark,
 } from './features/visit/priorityModel'
 import type { VisitDetails } from './features/visit/visitSetupModel'
+import type { GeneratedItinerary } from './features/visit/itineraryModel'
 
 export default function App() {
   // The visit draft intentionally lives only for this browser session. There is
@@ -18,6 +20,8 @@ export default function App() {
   const [selectedParkId, setSelectedParkId] = useState<number>()
   const [prioritySelections, setPrioritySelections] =
     useState<PrioritySelectionsByPark>({})
+  const [generatedItinerary, setGeneratedItinerary] =
+    useState<GeneratedItinerary | null>(null)
 
   const changePriority = useCallback((
     parkId: number,
@@ -27,6 +31,17 @@ export default function App() {
     setPrioritySelections((current) =>
       updatePriorityForPark(current, parkId, attractionId, priority),
     )
+    setGeneratedItinerary(null)
+  }, [])
+
+  const saveVisitDetails = useCallback((details: VisitDetails) => {
+    setVisitDetails(details)
+    setGeneratedItinerary(null)
+  }, [])
+
+  const changePark = useCallback((parkId: number) => {
+    setSelectedParkId(parkId)
+    setGeneratedItinerary(null)
   }, [])
 
   return (
@@ -34,14 +49,15 @@ export default function App() {
       <Route path="/" element={<Dashboard />} />
       <Route
         path="/visit"
-        element={<VisitSetup savedDetails={visitDetails} onContinue={setVisitDetails} />}
+        element={<VisitSetup savedDetails={visitDetails} onContinue={saveVisitDetails} />}
       />
       <Route
         path="/visit/priorities"
         element={
           visitDetails ? (
             <AttractionPriorities
-              onParkChange={setSelectedParkId}
+              onParkChange={changePark}
+              onGenerated={setGeneratedItinerary}
               onPriorityChange={changePriority}
               priorities={
                 selectedParkId === undefined
@@ -53,6 +69,16 @@ export default function App() {
             />
           ) : (
             <Navigate to="/visit" replace />
+          )
+        }
+      />
+      <Route
+        path="/visit/itinerary"
+        element={
+          generatedItinerary ? (
+            <ItineraryResults plan={generatedItinerary} />
+          ) : (
+            <Navigate to={visitDetails ? '/visit/priorities' : '/visit'} replace />
           )
         }
       />

@@ -440,7 +440,7 @@ As the optimization engine,
 I want to estimate walking time between attractions,  
 so that itinerary decisions account for travel time.
 
-### [MVP REQUIRED] Story 6.3 — Calculate routes between attractions
+### [DONE] [MVP REQUIRED] Story 6.3 — Calculate routes between attractions
 
 As the optimization engine,  
 I want a graph representing walkable park routes,  
@@ -462,7 +462,7 @@ This is the core product capability.
 
 ## User Stories
 
-### [MVP REQUIRED] Story 7.1 — Generate optimized itinerary
+### [DONE] [MVP REQUIRED] Story 7.1 — Generate optimized itinerary
 
 As a visitor,  
 I want the system to generate an ordered itinerary,  

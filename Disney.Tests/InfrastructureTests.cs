@@ -273,6 +273,56 @@ public sealed class InfrastructureTests
         Assert.Contains("destination.is_active", readerSourceCode);
         Assert.Contains("origin.latitude AS FromLatitude", readerSourceCode);
         Assert.Contains("destination.longitude AS ToLongitude", readerSourceCode);
+        Assert.Contains("origin.route_node_id AS FromRouteNodeId", readerSourceCode);
+        Assert.Contains("public.park_route_edges", readerSourceCode);
+        Assert.Contains("edge.is_bidirectional", readerSourceCode);
+    }
+
+    [Fact]
+    public void ParkRouteGraphMigration_ConstrainsNodesAndEdgesToOnePark()
+    {
+        var migrationPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Disney.Infrastructure",
+            "Migrations",
+            "010_add_park_route_graph.sql");
+        var migrationSql = File.ReadAllText(Path.GetFullPath(migrationPath));
+
+        Assert.Contains("CREATE TABLE public.park_route_nodes", migrationSql);
+        Assert.Contains("CREATE TABLE public.park_route_edges", migrationSql);
+        Assert.Contains("FOREIGN KEY (from_node_id, park_id)", migrationSql);
+        Assert.Contains("FOREIGN KEY (to_node_id, park_id)", migrationSql);
+        Assert.Contains("CHECK (distance_meters > 0)", migrationSql);
+        Assert.Contains("ADD COLUMN route_node_id bigint", migrationSql);
+        Assert.Contains("FOREIGN KEY (route_node_id, park_id)", migrationSql);
+    }
+
+    [Fact]
+    public void ItineraryCandidateReader_UsesLatestValidObservation()
+    {
+        var readerPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Disney.Infrastructure",
+            "PostgreSqlItineraryCandidateReader.cs");
+        var readerSourceCode = File.ReadAllText(Path.GetFullPath(readerPath));
+
+        Assert.Contains("LEFT JOIN LATERAL", readerSourceCode);
+        Assert.Contains(
+            "attraction.duration_minutes::integer AS DurationMinutes",
+            readerSourceCode);
+        Assert.Contains("observation.is_valid", readerSourceCode);
+        Assert.Contains("ORDER BY observation.observed_at DESC", readerSourceCode);
+        Assert.Contains("LIMIT 1", readerSourceCode);
+        Assert.Contains("attraction.id = ANY(@AttractionIds)", readerSourceCode);
+        Assert.Contains("park.is_active", readerSourceCode);
     }
 
     private sealed class StubHandler(HttpStatusCode statusCode, string content)

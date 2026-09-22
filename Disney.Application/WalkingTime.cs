@@ -1,9 +1,18 @@
+using Disney.Domain;
+
 namespace Disney.Application;
 
 public enum WalkingTimeEstimateStatus
 {
     Available,
-    CoordinatesUnavailable
+    CoordinatesUnavailable,
+    RouteUnavailable
+}
+
+public enum WalkingRouteSource
+{
+    ParkGraph,
+    CoordinateEstimate
 }
 
 public sealed record WalkingTimeData(
@@ -14,7 +23,11 @@ public sealed record WalkingTimeData(
     long ToAttractionId,
     string ToAttractionName,
     decimal? ToLatitude,
-    decimal? ToLongitude);
+    decimal? ToLongitude,
+    long? FromRouteNodeId = null,
+    long? ToRouteNodeId = null,
+    IReadOnlyList<long>? RouteNodeIds = null,
+    IReadOnlyList<WalkableRouteEdge>? RouteEdges = null);
 
 public sealed record WalkingTimeEstimateResult(
     long ParkId,
@@ -26,6 +39,8 @@ public sealed record WalkingTimeEstimateResult(
     int? DirectDistanceMeters,
     int? EstimatedRouteDistanceMeters,
     int? EstimatedWalkingMinutes,
+    WalkingRouteSource? RouteSource,
+    IReadOnlyList<long>? RouteNodeIds,
     decimal RouteDistanceMultiplier,
     decimal WalkingSpeedMetersPerSecond,
     string AlgorithmVersion);

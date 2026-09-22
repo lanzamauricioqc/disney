@@ -443,6 +443,8 @@ public sealed class ApplicationTests
         Assert.InRange(result.DirectDistanceMeters!.Value, 999, 1001);
         Assert.InRange(result.EstimatedRouteDistanceMeters!.Value, 1249, 1251);
         Assert.Equal(15, result.EstimatedWalkingMinutes);
+        Assert.Equal(WalkingRouteSource.CoordinateEstimate, result.RouteSource);
+        Assert.Null(result.RouteNodeIds);
         Assert.Equal(1.25m, result.RouteDistanceMultiplier);
         Assert.Equal(1.4m, result.WalkingSpeedMetersPerSecond);
         Assert.Equal("haversine-route-factor-v1", result.AlgorithmVersion);
@@ -469,6 +471,98 @@ public sealed class ApplicationTests
         Assert.Null(result.DirectDistanceMeters);
         Assert.Null(result.EstimatedRouteDistanceMeters);
         Assert.Null(result.EstimatedWalkingMinutes);
+        Assert.Null(result.RouteSource);
+        Assert.Null(result.RouteNodeIds);
+    }
+
+    [Fact]
+    public async Task WalkingTimeService_UsesShortestParkGraphRoute()
+    {
+        var service = new WalkingTimeService(new FakeWalkingTimeReader(
+            new WalkingTimeData(
+                10,
+                "Origin",
+                28.4m,
+                -81.5m,
+                20,
+                "Destination",
+                28.41m,
+                -81.49m,
+                1,
+                4,
+                [1, 2, 3, 4],
+                [
+                    new WalkableRouteEdge(1, 2, 100),
+                    new WalkableRouteEdge(2, 4, 300),
+                    new WalkableRouteEdge(1, 3, 120),
+                    new WalkableRouteEdge(3, 4, 150)
+                ])));
+
+        var result = await service.EstimateAsync(1, 10, 20, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(WalkingTimeEstimateStatus.Available, result.Status);
+        Assert.Equal(270, result.EstimatedRouteDistanceMeters);
+        Assert.Equal(4, result.EstimatedWalkingMinutes);
+        Assert.Equal(WalkingRouteSource.ParkGraph, result.RouteSource);
+        Assert.Equal([1L, 3L, 4L], result.RouteNodeIds);
+        Assert.Equal(1m, result.RouteDistanceMultiplier);
+        Assert.Equal("park-graph-dijkstra-v1", result.AlgorithmVersion);
+    }
+
+    [Fact]
+    public async Task WalkingTimeService_UsesGraphWithoutAttractionCoordinates()
+    {
+        var service = new WalkingTimeService(new FakeWalkingTimeReader(
+            new WalkingTimeData(
+                10,
+                "Origin",
+                null,
+                null,
+                20,
+                "Destination",
+                null,
+                null,
+                1,
+                2,
+                [1, 2],
+                [new WalkableRouteEdge(1, 2, 84)])));
+
+        var result = await service.EstimateAsync(1, 10, 20, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(WalkingTimeEstimateStatus.Available, result.Status);
+        Assert.Null(result.DirectDistanceMeters);
+        Assert.Equal(84, result.EstimatedRouteDistanceMeters);
+        Assert.Equal(1, result.EstimatedWalkingMinutes);
+    }
+
+    [Fact]
+    public async Task WalkingTimeService_ReportsUnavailableDisconnectedRoute()
+    {
+        var service = new WalkingTimeService(new FakeWalkingTimeReader(
+            new WalkingTimeData(
+                10,
+                "Origin",
+                28.4m,
+                -81.5m,
+                20,
+                "Destination",
+                28.41m,
+                -81.49m,
+                1,
+                2,
+                [1, 2],
+                [])));
+
+        var result = await service.EstimateAsync(1, 10, 20, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(WalkingTimeEstimateStatus.RouteUnavailable, result.Status);
+        Assert.NotNull(result.DirectDistanceMeters);
+        Assert.Null(result.EstimatedRouteDistanceMeters);
+        Assert.Equal(WalkingRouteSource.ParkGraph, result.RouteSource);
+        Assert.Equal(1m, result.RouteDistanceMultiplier);
     }
 
     [Fact]
@@ -517,6 +611,266 @@ public sealed class ApplicationTests
 
         Assert.InRange(distance, 20_015_000, 20_016_000);
     }
+
+    [Fact]
+    public void WalkableParkGraph_ReturnsZeroDistanceForSameNode()
+    {
+        var graph = new WalkableParkGraph([1], []);
+
+        var route = graph.FindShortestRoute(1, 1);
+
+        Assert.NotNull(route);
+        Assert.Equal([1L], route.NodeIds);
+        Assert.Equal(0, route.DistanceMeters);
+    }
+
+    [Fact]
+    public void WalkableParkGraph_ReturnsNullForUnknownOrDisconnectedNodes()
+    {
+        var graph = new WalkableParkGraph([1, 2], []);
+
+        Assert.Null(graph.FindShortestRoute(1, 2));
+        Assert.Null(graph.FindShortestRoute(1, 3));
+    }
+
+    [Fact]
+    public void WalkableParkGraph_UsesStableNodeOrderForEqualRoutes()
+    {
+        var graph = new WalkableParkGraph(
+            [1, 2, 3, 4],
+            [
+                new WalkableRouteEdge(1, 3, 10),
+                new WalkableRouteEdge(3, 4, 10),
+                new WalkableRouteEdge(1, 2, 10),
+                new WalkableRouteEdge(2, 4, 10)
+            ]);
+
+        var route = graph.FindShortestRoute(1, 4);
+
+        Assert.NotNull(route);
+        Assert.Equal([1L, 2L, 4L], route.NodeIds);
+    }
+
+    [Fact]
+    public void WalkableParkGraph_RejectsInvalidGraphData()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new WalkableParkGraph([0], []));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new WalkableParkGraph(
+                [1, 2],
+                [new WalkableRouteEdge(1, 2, 0)]));
+        Assert.Throws<ArgumentException>(
+            () => new WalkableParkGraph(
+                [1],
+                [new WalkableRouteEdge(1, 2, 10)]));
+    }
+
+    [Fact]
+    public async Task ItineraryOptimizer_GeneratesDeterministicOrderedStops()
+    {
+        var visitStart = new DateTimeOffset(2026, 9, 22, 9, 0, 0, TimeSpan.Zero);
+        var generatedAt = visitStart.AddHours(-1);
+        var service = new ItineraryOptimizationService(
+            new FakeItineraryCandidateReader(
+                [
+                    new ItineraryCandidate(1, "Must Do", true, 20, true, 60),
+                    new ItineraryCandidate(2, "Longer Wait", true, 10, true, 20),
+                    new ItineraryCandidate(3, "Shorter Wait", true, 15, true, 5)
+                ]),
+            new FixedWalkingTimeService(5),
+            new FixedTimeProvider(generatedAt));
+        var command = new GenerateItineraryCommand(
+            visitStart,
+            visitStart.AddHours(8),
+            null,
+            [
+                new ItineraryPreference(2, AttractionPreferenceLevel.WouldLike),
+                new ItineraryPreference(1, AttractionPreferenceLevel.MustDo),
+                new ItineraryPreference(3, AttractionPreferenceLevel.WouldLike)
+            ]);
+
+        var result = await service.GenerateAsync(10, command, CancellationToken.None);
+
+        Assert.Equal([1L, 3L, 2L], result.Stops.Select(stop => stop.AttractionId));
+        Assert.Equal([1, 2, 3], result.Stops.Select(stop => stop.Sequence));
+        Assert.Equal(0, result.Stops[0].WalkingMinutes);
+        Assert.Equal(5, result.Stops[1].WalkingMinutes);
+        Assert.Equal(5, result.Stops[2].WalkingMinutes);
+        Assert.Equal(10, result.TotalWalkingMinutes);
+        Assert.Equal(85, result.TotalQueueMinutes);
+        Assert.Equal(45, result.TotalAttractionMinutes);
+        Assert.Equal(generatedAt, result.GeneratedAt);
+        Assert.Equal("priority-current-wait-greedy-v1", result.AlgorithmVersion);
+        Assert.Empty(result.UnscheduledAttractions);
+    }
+
+    [Fact]
+    public async Task ItineraryOptimizer_ReportsWhyAttractionsWereNotScheduled()
+    {
+        var visitStart = new DateTimeOffset(2026, 9, 22, 9, 0, 0, TimeSpan.Zero);
+        var service = new ItineraryOptimizationService(
+            new FakeItineraryCandidateReader(
+                [
+                    new ItineraryCandidate(1, "Skipped", true, 10, true, 0),
+                    new ItineraryCandidate(2, "Inactive", false, 10, true, 0),
+                    new ItineraryCandidate(3, "Closed", true, 10, false, null),
+                    new ItineraryCandidate(5, "Too Long", true, 60, true, 0)
+                ]),
+            new FixedWalkingTimeService(0),
+            new FixedTimeProvider(visitStart));
+        var command = new GenerateItineraryCommand(
+            visitStart,
+            visitStart.AddMinutes(30),
+            null,
+            [
+                new ItineraryPreference(1, AttractionPreferenceLevel.Skip),
+                new ItineraryPreference(2, AttractionPreferenceLevel.WouldLike),
+                new ItineraryPreference(3, AttractionPreferenceLevel.MustDo),
+                new ItineraryPreference(4, AttractionPreferenceLevel.WouldLike),
+                new ItineraryPreference(5, AttractionPreferenceLevel.MustDo)
+            ]);
+
+        var result = await service.GenerateAsync(1, command, CancellationToken.None);
+
+        Assert.Empty(result.Stops);
+        Assert.Contains(
+            result.UnscheduledAttractions,
+            item => item.AttractionId == 1 &&
+                item.Reason == UnscheduledAttractionReason.SkippedByVisitor);
+        Assert.Contains(
+            result.UnscheduledAttractions,
+            item => item.AttractionId == 2 &&
+                item.Reason == UnscheduledAttractionReason.AttractionUnavailable);
+        Assert.Contains(
+            result.UnscheduledAttractions,
+            item => item.AttractionId == 3 &&
+                item.Reason == UnscheduledAttractionReason.AttractionClosed);
+        Assert.Contains(
+            result.UnscheduledAttractions,
+            item => item.AttractionId == 4 &&
+                item.Reason == UnscheduledAttractionReason.AttractionUnavailable);
+        Assert.Contains(
+            result.UnscheduledAttractions,
+            item => item.AttractionId == 5 &&
+                item.Reason == UnscheduledAttractionReason.VisitWindowExceeded);
+    }
+
+    [Fact]
+    public async Task ItineraryOptimizer_UsesDefaultDurationAndStartingLocation()
+    {
+        var visitStart = new DateTimeOffset(2026, 9, 22, 9, 0, 0, TimeSpan.Zero);
+        var walkingTimeService = new FixedWalkingTimeService(7);
+        var service = new ItineraryOptimizationService(
+            new FakeItineraryCandidateReader(
+                [new ItineraryCandidate(1, "Attraction", true, null, null, null)]),
+            walkingTimeService,
+            new FixedTimeProvider(visitStart));
+        var command = new GenerateItineraryCommand(
+            visitStart,
+            visitStart.AddHours(1),
+            99,
+            [new ItineraryPreference(1, AttractionPreferenceLevel.WouldLike)]);
+
+        var result = await service.GenerateAsync(1, command, CancellationToken.None);
+
+        var stop = Assert.Single(result.Stops);
+        Assert.Equal(7, stop.WalkingMinutes);
+        Assert.Equal(0, stop.QueueMinutes);
+        Assert.Equal(10, stop.AttractionDurationMinutes);
+        Assert.Equal((99L, 1L), Assert.Single(walkingTimeService.Requests));
+    }
+
+    [Fact]
+    public async Task ItineraryOptimizer_DoesNotScheduleWithoutAWalkingRoute()
+    {
+        var visitStart = new DateTimeOffset(2026, 9, 22, 9, 0, 0, TimeSpan.Zero);
+        var service = new ItineraryOptimizationService(
+            new FakeItineraryCandidateReader(
+                [new ItineraryCandidate(1, "Attraction", true, 10, true, 0)]),
+            new UnavailableWalkingTimeService(),
+            new FixedTimeProvider(visitStart));
+        var command = new GenerateItineraryCommand(
+            visitStart,
+            visitStart.AddHours(1),
+            99,
+            [new ItineraryPreference(1, AttractionPreferenceLevel.MustDo)]);
+
+        var result = await service.GenerateAsync(1, command, CancellationToken.None);
+
+        Assert.Empty(result.Stops);
+        var unscheduled = Assert.Single(result.UnscheduledAttractions);
+        Assert.Equal(
+            UnscheduledAttractionReason.WalkingRouteUnavailable,
+            unscheduled.Reason);
+    }
+
+    [Fact]
+    public async Task ItineraryOptimizer_RejectsInvalidRequests()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var service = new ItineraryOptimizationService(
+            new FakeItineraryCandidateReader([]),
+            new FixedWalkingTimeService(0),
+            new FixedTimeProvider(now));
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.GenerateAsync(
+                0,
+                ValidItineraryCommand(now),
+                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.GenerateAsync(
+                1,
+                ValidItineraryCommand(now) with { VisitEndAt = now },
+                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.GenerateAsync(
+                1,
+                ValidItineraryCommand(now) with
+                {
+                    VisitEndAt = now.Add(
+                        ItineraryOptimizationService.MaximumVisitWindow).AddMinutes(1)
+                },
+                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.GenerateAsync(
+                1,
+                ValidItineraryCommand(now) with { Preferences = [] },
+                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.GenerateAsync(
+                1,
+                ValidItineraryCommand(now) with
+                {
+                    Preferences =
+                    [
+                        new ItineraryPreference(1, AttractionPreferenceLevel.MustDo),
+                        new ItineraryPreference(1, AttractionPreferenceLevel.Skip)
+                    ]
+                },
+                CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.GenerateAsync(
+                1,
+                ValidItineraryCommand(now) with
+                {
+                    Preferences =
+                    [
+                        new ItineraryPreference(
+                            1,
+                            (AttractionPreferenceLevel)999)
+                    ]
+                },
+                CancellationToken.None));
+    }
+
+    private static GenerateItineraryCommand ValidItineraryCommand(DateTimeOffset start) =>
+        new(
+            start,
+            start.AddHours(8),
+            null,
+            [new ItineraryPreference(1, AttractionPreferenceLevel.MustDo)]);
 
     private static Park CreatePark(
         long id = 1,
@@ -713,6 +1067,56 @@ public sealed class ApplicationTests
             long toAttractionId,
             CancellationToken cancellationToken) =>
             Task.FromResult(data);
+    }
+
+    private sealed class FakeItineraryCandidateReader(
+        IReadOnlyList<ItineraryCandidate> candidates) : IItineraryCandidateReader
+    {
+        public Task<IReadOnlyList<ItineraryCandidate>> GetCandidatesAsync(
+            long parkId,
+            IReadOnlyCollection<long> attractionIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(candidates);
+    }
+
+    private sealed class FixedWalkingTimeService(int walkingMinutes)
+        : IWalkingTimeService
+    {
+        public List<(long FromAttractionId, long ToAttractionId)> Requests { get; } = [];
+
+        public Task<WalkingTimeEstimateResult?> EstimateAsync(
+            long parkId,
+            long fromAttractionId,
+            long toAttractionId,
+            CancellationToken cancellationToken)
+        {
+            Requests.Add((fromAttractionId, toAttractionId));
+            return Task.FromResult<WalkingTimeEstimateResult?>(new(
+                parkId,
+                fromAttractionId,
+                "Origin",
+                toAttractionId,
+                "Destination",
+                WalkingTimeEstimateStatus.Available,
+                null,
+                walkingMinutes * 84,
+                walkingMinutes,
+                WalkingRouteSource.ParkGraph,
+                null,
+                1m,
+                1.4m,
+                "test"));
+        }
+    }
+
+    private sealed class UnavailableWalkingTimeService : IWalkingTimeService
+    {
+        public Task<WalkingTimeEstimateResult?> EstimateAsync(
+            long parkId,
+            long fromAttractionId,
+            long toAttractionId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<WalkingTimeEstimateResult?>(null);
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider

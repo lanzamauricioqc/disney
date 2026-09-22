@@ -5,6 +5,8 @@ import type {
   AdminObservation,
   AdminPark,
   CurrentWaitTimesResult,
+  OptimizedItinerary,
+  OptimizeItineraryRequest,
   DailyParkWaitTimesResult,
   DailyWaitTimeHistoryResult,
   Park,
@@ -71,6 +73,21 @@ export function getCurrentWaitTimes(parkId: number, signal?: AbortSignal) {
   return getJson<CurrentWaitTimesResult>(
     `/api/v1/parks/${parkId}/wait-times/current`,
     signal,
+  )
+}
+
+export function optimizeItinerary(
+  parkId: number,
+  request: OptimizeItineraryRequest,
+  signal?: AbortSignal,
+) {
+  return requestJson<OptimizedItinerary>(
+    `/api/v1/parks/${parkId}/itineraries/optimize`,
+    {
+      method: 'POST',
+      body: JSON.stringify(request),
+      signal,
+    },
   )
 }
 

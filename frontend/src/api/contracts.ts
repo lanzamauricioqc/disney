@@ -168,3 +168,57 @@ export interface SaveAdminAttraction {
   latitude: number | null
   longitude: number | null
 }
+
+export type ItineraryPreference = 'MustDo' | 'WouldLike' | 'Skip'
+
+export interface ItineraryPreferenceRequest {
+  attractionId: number
+  level: ItineraryPreference
+}
+
+export interface OptimizeItineraryRequest {
+  visitStartAt: string
+  visitEndAt: string
+  startingAttractionId: number | null
+  preferences: ItineraryPreferenceRequest[]
+}
+
+export interface ItineraryStop {
+  sequence: number
+  attractionId: number
+  attractionName: string
+  preference: ItineraryPreference
+  travelStartsAt: string
+  walkingMinutes: number
+  queueStartsAt: string
+  queueMinutes: number
+  attractionStartsAt: string
+  attractionDurationMinutes: number
+  completesAt: string
+}
+
+export type UnscheduledItineraryReason =
+  | 'SkippedByVisitor'
+  | 'AttractionUnavailable'
+  | 'AttractionClosed'
+  | 'WalkingRouteUnavailable'
+  | 'VisitWindowExceeded'
+
+export interface UnscheduledAttraction {
+  attractionId: number
+  preference: ItineraryPreference
+  reason: UnscheduledItineraryReason
+}
+
+export interface OptimizedItinerary {
+  parkId: number
+  visitStartAt: string
+  visitEndAt: string
+  generatedAt: string
+  stops: ItineraryStop[]
+  unscheduledAttractions: UnscheduledAttraction[]
+  totalWalkingMinutes: number
+  totalQueueMinutes: number
+  totalAttractionMinutes: number
+  algorithmVersion: string
+}

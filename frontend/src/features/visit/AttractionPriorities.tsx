@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import { getCurrentWaitTimes, getParks } from '../../api/client'
-import type { CurrentWaitTime } from '../../api/contracts'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Link, useNavigate } from 'react-router-dom'
+import { getCurrentWaitTimes, getParks, optimizeItinerary } from '../../api/client'
+import type { CurrentWaitTime, OptimizeItineraryRequest, Park } from '../../api/contracts'
 import { LanguageSelector, useI18n, type TranslationKey } from '../../i18n'
 import type { VisitDetails } from './visitSetupModel'
+import {
+  attractionNameSnapshot,
+  buildOptimizeItineraryRequest,
+  type GeneratedItinerary,
+} from './itineraryModel'
 import {
   countPriorities,
   recommendUnselectedAttractions,
@@ -17,6 +22,7 @@ interface AttractionPrioritiesProps {
   selectedParkId: number | undefined
   priorities: AttractionPriorities
   onParkChange: (parkId: number) => void
+  onGenerated: (itinerary: GeneratedItinerary) => void
   onPriorityChange: (
     parkId: number,
     attractionId: number,
@@ -42,17 +48,22 @@ export function AttractionPriorities({
   selectedParkId,
   priorities,
   onParkChange,
+  onGenerated,
   onPriorityChange,
 }: AttractionPrioritiesProps) {
   const { locale, t } = useI18n()
+  const navigate = useNavigate()
   const headingRef = useRef<HTMLHeadingElement>(null)
   const recommendationsRef = useRef<HTMLElement>(null)
   const recommendationHeadingRef = useRef<HTMLHeadingElement>(null)
   const recommendationFocusPending = useRef(false)
+  const generationErrorRef = useRef<HTMLDivElement>(null)
+  const generationAbortController = useRef<AbortController | null>(null)
   const [search, setSearch] = useState('')
   const [landFilter, setLandFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [announcement, setAnnouncement] = useState('')
+  const [requestValidationError, setRequestValidationError] = useState(false)
 
   const parksQuery = useQuery({
     queryKey: ['parks'],
@@ -147,12 +158,74 @@ export function AttractionPriorities({
   )
   const counts = countPriorities(priorities, attractions.length)
   const selectedPark = parks.find((park) => park.id === selectedParkId)
+  const generation = useMutation({
+    mutationFn: (submission: {
+      park: Park
+      request: OptimizeItineraryRequest
+      attractionNames: Readonly<Record<number, string>>
+      signal: AbortSignal
+    }) => optimizeItinerary(submission.park.id, submission.request, submission.signal),
+    onSuccess: (itinerary, submission) => {
+      if (submission.signal.aborted) return
+      onGenerated({
+        itinerary,
+        park: submission.park,
+        attractionNames: submission.attractionNames,
+      })
+      navigate('/visit/itinerary')
+    },
+  })
+
+  useEffect(() => {
+    generationAbortController.current?.abort()
+    generation.reset()
+    setRequestValidationError(false)
+  }, [selectedParkId])
+
+  useEffect(() => {
+    return () => generationAbortController.current?.abort()
+  }, [])
+
+  useEffect(() => {
+    if (generation.isError || requestValidationError) generationErrorRef.current?.focus()
+  }, [generation.isError, requestValidationError])
+
+  const generateItinerary = () => {
+    if (!selectedPark || Object.keys(priorities).length === 0) return
+    generationAbortController.current?.abort()
+    generation.reset()
+    setRequestValidationError(false)
+
+    let request: OptimizeItineraryRequest
+    try {
+      request = buildOptimizeItineraryRequest(
+        visitDetails,
+        selectedPark.timezone,
+        priorities,
+      )
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error
+      setRequestValidationError(true)
+      return
+    }
+
+    const abortController = new AbortController()
+    generationAbortController.current = abortController
+    generation.mutate({
+      park: selectedPark,
+      request,
+      attractionNames: attractionNameSnapshot(attractions),
+      signal: abortController.signal,
+    })
+  }
 
   const changePriority = (
     attraction: CurrentWaitTime,
     priority: AttractionPriority | null,
   ) => {
     if (selectedParkId === undefined) return
+    generation.reset()
+    setRequestValidationError(false)
     onPriorityChange(selectedParkId, attraction.attractionId, priority)
     setAnnouncement(
       priority === null
@@ -193,6 +266,7 @@ export function AttractionPriorities({
           <ol className="setup-progress" aria-label={t('planningProgress')}>
             <li className="complete"><span aria-hidden="true">✓</span>{t('visitDetailsStep')}</li>
             <li className="active" aria-current="step"><span>2</span>{t('prioritiesStep')}</li>
+            <li><span>3</span>{t('itineraryStep')}</li>
           </ol>
 
           <section className="surface priority-visit-summary" aria-labelledby="visit-context-title">
@@ -217,7 +291,7 @@ export function AttractionPriorities({
           </aside>
         </aside>
 
-        <div className="priority-workspace" aria-busy={parksQuery.isLoading || waitsQuery.isLoading}>
+        <div className="priority-workspace" aria-busy={parksQuery.isLoading || waitsQuery.isLoading || generation.isPending}>
           <section className="surface park-choice" aria-labelledby="park-choice-title">
             <div>
               <p className="eyebrow">{t('catalogChoices')}</p>
@@ -238,6 +312,7 @@ export function AttractionPriorities({
               <label className="priority-park-selector" htmlFor="priority-park">
                 <span>{t('viewingPark')}</span>
                 <select
+                  disabled={generation.isPending}
                   id="priority-park"
                   value={selectedParkId ?? ''}
                   onChange={(event) => {
@@ -308,6 +383,7 @@ export function AttractionPriorities({
                             </div>
                             <button
                               className="recommendation-add"
+                              disabled={generation.isPending}
                               onClick={() => {
                                 recommendationFocusPending.current = true
                                 changePriority(attraction, 'would-like')
@@ -371,15 +447,67 @@ export function AttractionPriorities({
                         <AttractionPriorityRow
                           attraction={attraction}
                           key={attraction.attractionId}
+                          disabled={generation.isPending}
                           onChange={(priority) => changePriority(attraction, priority)}
                           priority={priorities[attraction.attractionId]}
                         />
                       ))}
                     </div>
 
+                    {(generation.isError || requestValidationError) && (
+                      <div
+                        className="itinerary-generation-error"
+                        ref={generationErrorRef}
+                        role="alert"
+                        tabIndex={-1}
+                      >
+                        <div>
+                          <strong>{t('itineraryGenerationFailed')}</strong>
+                          <p>
+                            {requestValidationError
+                              ? t('itineraryVisitTimeInvalid')
+                              : t('itineraryGenerationFailedHelp')}
+                          </p>
+                        </div>
+                        {requestValidationError ? (
+                          <Link className="secondary-button button-link" to="/visit">
+                            {t('editVisitDetails')}
+                          </Link>
+                        ) : (
+                          <button
+                            className="secondary-button"
+                            disabled={generation.isPending}
+                            onClick={generateItinerary}
+                            type="button"
+                          >
+                            {t('retry')}
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <footer className="priority-footer">
-                      <p><span aria-hidden="true">●</span>{t('automaticSave')}</p>
-                      <Link className="secondary-button button-link" to="/visit">{t('editVisitDetails')}</Link>
+                      <div className="priority-footer-copy">
+                        <p><span aria-hidden="true">●</span>{t('automaticSave')}</p>
+                        {Object.keys(priorities).length === 0 && (
+                          <p className="generate-help">{t('selectPriorityToGenerate')}</p>
+                        )}
+                      </div>
+                      <div className="priority-footer-actions">
+                        <Link className="secondary-button button-link" to="/visit">{t('editVisitDetails')}</Link>
+                        <button
+                          className="primary-button generate-itinerary-button"
+                          disabled={
+                            generation.isPending ||
+                            !selectedPark ||
+                            Object.keys(priorities).length === 0
+                          }
+                          onClick={generateItinerary}
+                          type="button"
+                        >
+                          {generation.isPending ? t('generatingItinerary') : t('generateItinerary')}
+                          <span aria-hidden="true">→</span>
+                        </button>
+                      </div>
                     </footer>
                   </section>
                 </>
@@ -397,10 +525,12 @@ function AttractionPriorityRow({
   attraction,
   priority,
   onChange,
+  disabled,
 }: {
   attraction: CurrentWaitTime
   priority: AttractionPriority | undefined
   onChange: (priority: AttractionPriority | null) => void
+  disabled: boolean
 }) {
   const { locale, t } = useI18n()
 
@@ -415,7 +545,7 @@ function AttractionPriorityRow({
           </span>
         </p>
       </div>
-      <fieldset className="priority-control">
+      <fieldset className="priority-control" disabled={disabled}>
         <legend>{t('setPriorityFor', { name: attraction.attractionName })}</legend>
         <div>
           {priorityOptions.map((option) => {

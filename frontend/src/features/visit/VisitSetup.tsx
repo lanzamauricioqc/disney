@@ -131,6 +131,7 @@ export function VisitSetup({ savedDetails, onContinue }: VisitSetupProps) {
           <ol className="setup-progress" aria-label={t('planningProgress')}>
             <li className="active" aria-current="step"><span>1</span>{t('visitDetailsStep')}</li>
             <li><span>2</span>{t('prioritiesStep')}</li>
+            <li><span>3</span>{t('itineraryStep')}</li>
           </ol>
           <aside className="visit-note">
             <span aria-hidden="true">✦</span>
