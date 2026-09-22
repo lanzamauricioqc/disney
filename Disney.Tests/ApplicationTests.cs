@@ -701,8 +701,76 @@ public sealed class ApplicationTests
         Assert.Equal(85, result.TotalQueueMinutes);
         Assert.Equal(45, result.TotalAttractionMinutes);
         Assert.Equal(generatedAt, result.GeneratedAt);
-        Assert.Equal("priority-current-wait-greedy-v1", result.AlgorithmVersion);
+        Assert.Equal("priority-live-history-walking-greedy-v2", result.AlgorithmVersion);
         Assert.Empty(result.UnscheduledAttractions);
+    }
+
+    [Fact]
+    public async Task ItineraryOptimizer_UsesHistoricalWaitPatternsWithCurrentWaits()
+    {
+        var visitStart = new DateTimeOffset(2026, 9, 22, 9, 0, 0, TimeSpan.Zero);
+        var generatedAt = visitStart.AddHours(-1);
+        var candidateReader = new FakeItineraryCandidateReader(
+            [
+                new ItineraryCandidate(1, "Currently Short", true, 10, true, 5, 95),
+                new ItineraryCandidate(2, "Consistently Moderate", true, 10, true, 20, 20),
+                new ItineraryCandidate(3, "Historical Only", true, 10, true, null, 25)
+            ]);
+        var service = new ItineraryOptimizationService(
+            candidateReader,
+            new FixedWalkingTimeService(0),
+            new FixedTimeProvider(generatedAt));
+        var command = new GenerateItineraryCommand(
+            visitStart,
+            visitStart.AddHours(2),
+            null,
+            [
+                new ItineraryPreference(1, AttractionPreferenceLevel.WouldLike),
+                new ItineraryPreference(2, AttractionPreferenceLevel.WouldLike),
+                new ItineraryPreference(3, AttractionPreferenceLevel.WouldLike)
+            ]);
+
+        var result = await service.GenerateAsync(1, command, CancellationToken.None);
+
+        Assert.Equal([2L, 3L, 1L], result.Stops.Select(stop => stop.AttractionId));
+        Assert.Equal([20, 25, 35], result.Stops.Select(stop => stop.QueueMinutes));
+        Assert.Equal(visitStart, candidateReader.HistoricalTargetAt);
+        Assert.Equal(generatedAt.AddMonths(-3), candidateReader.HistoricalWindowStart);
+        Assert.Equal(generatedAt, candidateReader.HistoricalWindowEnd);
+    }
+
+    [Fact]
+    public async Task ItineraryOptimizer_ChoosesEfficientWalkingRouteWithinPriority()
+    {
+        var visitStart = new DateTimeOffset(2026, 9, 22, 9, 0, 0, TimeSpan.Zero);
+        var walkingTimeService = new ConfigurableWalkingTimeService(
+            new Dictionary<(long, long), int>
+            {
+                [(99, 1)] = 20,
+                [(99, 2)] = 1,
+                [(2, 1)] = 3
+            });
+        var service = new ItineraryOptimizationService(
+            new FakeItineraryCandidateReader(
+                [
+                    new ItineraryCandidate(1, "Nearby Wait", true, 10, true, 5),
+                    new ItineraryCandidate(2, "Short Walk", true, 10, true, 10)
+                ]),
+            walkingTimeService,
+            new FixedTimeProvider(visitStart.AddHours(-1)));
+        var command = new GenerateItineraryCommand(
+            visitStart,
+            visitStart.AddHours(2),
+            99,
+            [
+                new ItineraryPreference(1, AttractionPreferenceLevel.MustDo),
+                new ItineraryPreference(2, AttractionPreferenceLevel.MustDo)
+            ]);
+
+        var result = await service.GenerateAsync(1, command, CancellationToken.None);
+
+        Assert.Equal([2L, 1L], result.Stops.Select(stop => stop.AttractionId));
+        Assert.Equal([1, 3], result.Stops.Select(stop => stop.WalkingMinutes));
     }
 
     [Fact]
@@ -1072,11 +1140,23 @@ public sealed class ApplicationTests
     private sealed class FakeItineraryCandidateReader(
         IReadOnlyList<ItineraryCandidate> candidates) : IItineraryCandidateReader
     {
+        public DateTimeOffset? HistoricalTargetAt { get; private set; }
+        public DateTimeOffset? HistoricalWindowStart { get; private set; }
+        public DateTimeOffset? HistoricalWindowEnd { get; private set; }
+
         public Task<IReadOnlyList<ItineraryCandidate>> GetCandidatesAsync(
             long parkId,
             IReadOnlyCollection<long> attractionIds,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(candidates);
+            DateTimeOffset historicalTargetAt,
+            DateTimeOffset historicalWindowStart,
+            DateTimeOffset historicalWindowEnd,
+            CancellationToken cancellationToken)
+        {
+            HistoricalTargetAt = historicalTargetAt;
+            HistoricalWindowStart = historicalWindowStart;
+            HistoricalWindowEnd = historicalWindowEnd;
+            return Task.FromResult(candidates);
+        }
     }
 
     private sealed class FixedWalkingTimeService(int walkingMinutes)
@@ -1117,6 +1197,35 @@ public sealed class ApplicationTests
             long toAttractionId,
             CancellationToken cancellationToken) =>
             Task.FromResult<WalkingTimeEstimateResult?>(null);
+    }
+
+    private sealed class ConfigurableWalkingTimeService(
+        IReadOnlyDictionary<(long FromAttractionId, long ToAttractionId), int> walkingMinutes)
+        : IWalkingTimeService
+    {
+        public Task<WalkingTimeEstimateResult?> EstimateAsync(
+            long parkId,
+            long fromAttractionId,
+            long toAttractionId,
+            CancellationToken cancellationToken)
+        {
+            var minutes = walkingMinutes[(fromAttractionId, toAttractionId)];
+            return Task.FromResult<WalkingTimeEstimateResult?>(new(
+                parkId,
+                fromAttractionId,
+                "Origin",
+                toAttractionId,
+                "Destination",
+                WalkingTimeEstimateStatus.Available,
+                null,
+                minutes * 84,
+                minutes,
+                WalkingRouteSource.ParkGraph,
+                null,
+                1m,
+                1.4m,
+                "test"));
+        }
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider

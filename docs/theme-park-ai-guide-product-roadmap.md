@@ -468,31 +468,31 @@ As a visitor,
 I want the system to generate an ordered itinerary,  
 so that I know which attraction I should visit and when.
 
-### [MVP REQUIRED] Story 7.2 — Prioritize Must Do attractions
+### [DONE] [MVP REQUIRED] Story 7.2 — Prioritize Must Do attractions
 
 As a visitor,  
 I want Must Do attractions heavily prioritized,  
 so that the plan minimizes the risk of missing them.
 
-### [MVP REQUIRED] Story 7.3 — Consider current and historical queue times
+### [DONE] [MVP REQUIRED] Story 7.3 — Consider current and historical queue times
 
 As the optimization engine,  
 I want current waits and relevant historical queue patterns included in itinerary calculations,  
 so that the itinerary reflects live conditions and typical queue behavior.
 
-### [MVP REQUIRED] Story 7.4 — Consider walking time
+### [DONE] [MVP REQUIRED] Story 7.4 — Consider walking time
 
 As the optimization engine,  
 I want walking time included in itinerary calculations,  
 so that the plan avoids inefficient park traversal.
 
-### [MVP REQUIRED] Story 7.5 — Respect visit end time
+### [DONE] [MVP REQUIRED] Story 7.5 — Respect visit end time
 
 As the visitor,  
 I want the system to stop scheduling activities beyond my departure time,  
 so that the itinerary remains realistic.
 
-### [MVP REQUIRED] Story 7.6 — Respect attraction availability
+### [DONE] [MVP REQUIRED] Story 7.6 — Respect attraction availability
 
 As a visitor,  
 I want the optimizer to use the latest recorded open and active statuses when generating recommendations,  

@@ -253,6 +253,28 @@ public sealed class InfrastructureTests
     }
 
     [Fact]
+    public void ItineraryReader_UsesCurrentAndParkLocalHistoricalWaits()
+    {
+        var readerPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Disney.Infrastructure",
+            "PostgreSqlItineraryCandidateReader.cs");
+        var readerSourceCode = File.ReadAllText(Path.GetFullPath(readerPath));
+
+        Assert.Contains("latest_observation.wait_minutes AS WaitMinutes", readerSourceCode);
+        Assert.Contains("HistoricalWaitMinutes", readerSourceCode);
+        Assert.Contains("COUNT(*) >= 3", readerSourceCode);
+        Assert.Contains("percentile_cont(0.5)", readerSourceCode);
+        Assert.Contains("@HistoricalTargetAt AT TIME ZONE park.timezone", readerSourceCode);
+        Assert.Contains("observation.observed_day_of_week", readerSourceCode);
+        Assert.Contains("observation.observed_slot_minutes / 15", readerSourceCode);
+    }
+
+    [Fact]
     public void WalkingTimeReader_RequiresActiveAttractionsInTheSamePark()
     {
         var readerPath = Path.Combine(

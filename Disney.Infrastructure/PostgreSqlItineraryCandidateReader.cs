@@ -9,6 +9,9 @@ internal sealed class PostgreSqlItineraryCandidateReader(
     public async Task<IReadOnlyList<ItineraryCandidate>> GetCandidatesAsync(
         long parkId,
         IReadOnlyCollection<long> attractionIds,
+        DateTimeOffset historicalTargetAt,
+        DateTimeOffset historicalWindowStart,
+        DateTimeOffset historicalWindowEnd,
         CancellationToken cancellationToken)
     {
         await using var connection = connectionFactory.CreateConnection();
@@ -20,7 +23,8 @@ internal sealed class PostgreSqlItineraryCandidateReader(
                        attraction.is_active AS IsActive,
                        attraction.duration_minutes::integer AS DurationMinutes,
                        latest_observation.is_open AS IsOpen,
-                       latest_observation.wait_minutes AS WaitMinutes
+                       latest_observation.wait_minutes AS WaitMinutes,
+                       historical_wait.wait_minutes AS HistoricalWaitMinutes
                 FROM public.attractions attraction
                 JOIN public.parks park
                   ON park.id = attraction.park_id
@@ -34,6 +38,35 @@ internal sealed class PostgreSqlItineraryCandidateReader(
                     ORDER BY observation.observed_at DESC
                     LIMIT 1
                 ) latest_observation ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT CASE
+                               WHEN COUNT(*) >= 3
+                               THEN percentile_cont(0.5) WITHIN GROUP (
+                                   ORDER BY observation.wait_minutes
+                               )::smallint
+                           END AS wait_minutes
+                    FROM public.queue_observations observation
+                    WHERE observation.attraction_id = attraction.id
+                      AND observation.park_id = park.id
+                      AND observation.is_valid
+                      AND observation.is_open
+                      AND observation.wait_minutes IS NOT NULL
+                      AND observation.observed_at >= @HistoricalWindowStart
+                      AND observation.observed_at < @HistoricalWindowEnd
+                      AND observation.observed_day_of_week = EXTRACT(
+                          DOW FROM @HistoricalTargetAt AT TIME ZONE park.timezone
+                      )::smallint
+                      AND (observation.observed_slot_minutes / 15) * 15 = (
+                          (
+                              EXTRACT(
+                                  HOUR FROM @HistoricalTargetAt AT TIME ZONE park.timezone
+                              )::int * 60
+                              + EXTRACT(
+                                  MINUTE FROM @HistoricalTargetAt AT TIME ZONE park.timezone
+                              )::int
+                          ) / 15 * 15
+                      )
+                ) historical_wait ON TRUE
                 WHERE park.id = @ParkId
                   AND park.is_active
                   AND attraction.id = ANY(@AttractionIds)
@@ -42,7 +75,10 @@ internal sealed class PostgreSqlItineraryCandidateReader(
                 new
                 {
                     ParkId = parkId,
-                    AttractionIds = attractionIds.ToArray()
+                    AttractionIds = attractionIds.ToArray(),
+                    HistoricalTargetAt = historicalTargetAt,
+                    HistoricalWindowStart = historicalWindowStart,
+                    HistoricalWindowEnd = historicalWindowEnd
                 },
                 cancellationToken: cancellationToken));
         return candidates.AsList();

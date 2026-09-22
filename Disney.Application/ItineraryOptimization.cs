@@ -32,7 +32,8 @@ public sealed record ItineraryCandidate(
     bool IsActive,
     int? DurationMinutes,
     bool? IsOpen,
-    short? WaitMinutes);
+    short? WaitMinutes,
+    short? HistoricalWaitMinutes = null);
 
 public sealed record ItineraryStop(
     int Sequence,
@@ -69,6 +70,9 @@ public interface IItineraryCandidateReader
     Task<IReadOnlyList<ItineraryCandidate>> GetCandidatesAsync(
         long parkId,
         IReadOnlyCollection<long> attractionIds,
+        DateTimeOffset historicalTargetAt,
+        DateTimeOffset historicalWindowStart,
+        DateTimeOffset historicalWindowEnd,
         CancellationToken cancellationToken);
 }
 

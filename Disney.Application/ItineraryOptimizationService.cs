@@ -6,7 +6,8 @@ public sealed class ItineraryOptimizationService(
     TimeProvider timeProvider) : IItineraryOptimizationService
 {
     private const int DefaultAttractionDurationMinutes = 10;
-    private const string AlgorithmVersion = "priority-current-wait-greedy-v1";
+    private const int HistoricalLookbackMonths = 3;
+    private const string AlgorithmVersion = "priority-live-history-walking-greedy-v2";
     public static readonly TimeSpan MaximumVisitWindow = TimeSpan.FromDays(1);
 
     public async Task<OptimizedItineraryResult> GenerateAsync(
@@ -15,45 +16,49 @@ public sealed class ItineraryOptimizationService(
         CancellationToken cancellationToken)
     {
         Validate(parkId, command);
+        var generatedAt = timeProvider.GetUtcNow();
         var preferencesByAttraction = command.Preferences.ToDictionary(
             preference => preference.AttractionId);
         var candidates = await candidateReader.GetCandidatesAsync(
             parkId,
             preferencesByAttraction.Keys.ToArray(),
+            command.VisitStartAt,
+            generatedAt.AddMonths(-HistoricalLookbackMonths),
+            generatedAt,
             cancellationToken);
         var candidatesById = candidates.ToDictionary(candidate => candidate.AttractionId);
         var unscheduled = CreateInitiallyUnscheduled(
             command.Preferences,
             candidatesById);
-        var schedulableCandidates = OrderCandidates(
+        var remainingCandidates = GetSchedulableCandidates(
             command.Preferences,
-            candidatesById);
+            candidatesById).ToList();
 
         var stops = new List<ItineraryStop>();
         var cursor = command.VisitStartAt;
         var previousAttractionId = command.StartingAttractionId;
 
-        foreach (var candidate in schedulableCandidates)
+        while (remainingCandidates.Count > 0)
         {
-            var preference = preferencesByAttraction[candidate.AttractionId];
-            var walkingMinutes = await EstimateWalkingMinutesAsync(
+            var next = await SelectNextCandidateAsync(
                 parkId,
                 previousAttractionId,
-                candidate.AttractionId,
+                remainingCandidates,
+                preferencesByAttraction,
+                unscheduled,
                 cancellationToken);
-            if (walkingMinutes is null)
+            if (next is null)
             {
-                unscheduled.Add(new UnscheduledAttraction(
-                    candidate.AttractionId,
-                    preference.Level,
-                    UnscheduledAttractionReason.WalkingRouteUnavailable));
                 continue;
             }
 
-            var queueMinutes = candidate.WaitMinutes ?? 0;
+            var candidate = next.Candidate;
+            remainingCandidates.Remove(candidate);
+            var preference = preferencesByAttraction[candidate.AttractionId];
+            var queueMinutes = ExpectedQueueMinutes(candidate);
             var attractionDurationMinutes =
                 candidate.DurationMinutes ?? DefaultAttractionDurationMinutes;
-            var queueStartsAt = cursor.AddMinutes(walkingMinutes.Value);
+            var queueStartsAt = cursor.AddMinutes(next.WalkingMinutes);
             var attractionStartsAt = queueStartsAt.AddMinutes(queueMinutes);
             var completesAt = attractionStartsAt.AddMinutes(attractionDurationMinutes);
 
@@ -72,7 +77,7 @@ public sealed class ItineraryOptimizationService(
                 candidate.AttractionName,
                 preference.Level,
                 cursor,
-                walkingMinutes.Value,
+                next.WalkingMinutes,
                 queueStartsAt,
                 queueMinutes,
                 attractionStartsAt,
@@ -86,7 +91,7 @@ public sealed class ItineraryOptimizationService(
             parkId,
             command.VisitStartAt,
             command.VisitEndAt,
-            timeProvider.GetUtcNow(),
+            generatedAt,
             stops,
             unscheduled,
             stops.Sum(stop => stop.WalkingMinutes),
@@ -134,7 +139,7 @@ public sealed class ItineraryOptimizationService(
         return unscheduled;
     }
 
-    private static IReadOnlyList<ItineraryCandidate> OrderCandidates(
+    private static IReadOnlyList<ItineraryCandidate> GetSchedulableCandidates(
         IReadOnlyList<ItineraryPreference> preferences,
         IReadOnlyDictionary<long, ItineraryCandidate> candidates)
     {
@@ -147,13 +152,63 @@ public sealed class ItineraryOptimizationService(
                 candidate.IsOpen != false &&
                 preferenceByAttraction[candidate.AttractionId].Level !=
                     AttractionPreferenceLevel.Skip)
-            .OrderBy(candidate =>
-                PreferenceRank(preferenceByAttraction[candidate.AttractionId].Level))
-            .ThenBy(candidate => candidate.WaitMinutes ?? short.MaxValue)
-            .ThenBy(candidate => candidate.AttractionName, StringComparer.Ordinal)
-            .ThenBy(candidate => candidate.AttractionId)
             .ToArray();
     }
+
+    private async Task<CandidateOption?> SelectNextCandidateAsync(
+        long parkId,
+        long? previousAttractionId,
+        List<ItineraryCandidate> remainingCandidates,
+        IReadOnlyDictionary<long, ItineraryPreference> preferences,
+        List<UnscheduledAttraction> unscheduled,
+        CancellationToken cancellationToken)
+    {
+        var highestPriority = remainingCandidates.Min(candidate =>
+            PreferenceRank(preferences[candidate.AttractionId].Level));
+        var options = new List<CandidateOption>();
+
+        foreach (var candidate in remainingCandidates.Where(candidate =>
+                     PreferenceRank(preferences[candidate.AttractionId].Level) ==
+                     highestPriority).ToArray())
+        {
+            var walkingMinutes = await EstimateWalkingMinutesAsync(
+                parkId,
+                previousAttractionId,
+                candidate.AttractionId,
+                cancellationToken);
+            if (walkingMinutes is not null)
+            {
+                options.Add(new CandidateOption(candidate, walkingMinutes.Value));
+                continue;
+            }
+
+            remainingCandidates.Remove(candidate);
+            unscheduled.Add(new UnscheduledAttraction(
+                candidate.AttractionId,
+                preferences[candidate.AttractionId].Level,
+                UnscheduledAttractionReason.WalkingRouteUnavailable));
+        }
+
+        return options
+            .OrderBy(option =>
+                option.WalkingMinutes + ExpectedQueueMinutes(option.Candidate))
+            .ThenBy(option => ExpectedQueueMinutes(option.Candidate))
+            .ThenBy(option => option.Candidate.AttractionName, StringComparer.Ordinal)
+            .ThenBy(option => option.Candidate.AttractionId)
+            .FirstOrDefault();
+    }
+
+    private static int ExpectedQueueMinutes(ItineraryCandidate candidate) =>
+        (candidate.WaitMinutes, candidate.HistoricalWaitMinutes) switch
+        {
+            (short current, short historical) =>
+                (int)Math.Round(
+                    (current * 2m + historical) / 3m,
+                    MidpointRounding.AwayFromZero),
+            (short current, null) => current,
+            (null, short historical) => historical,
+            _ => 0
+        };
 
     private async Task<int?> EstimateWalkingMinutesAsync(
         long parkId,
@@ -187,6 +242,10 @@ public sealed class ItineraryOptimizationService(
                 preference,
                 "Unsupported attraction preference.")
         };
+
+    private sealed record CandidateOption(
+        ItineraryCandidate Candidate,
+        int WalkingMinutes);
 
     private static void Validate(long parkId, GenerateItineraryCommand command)
     {
