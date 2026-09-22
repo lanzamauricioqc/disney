@@ -251,3 +251,13 @@ export interface StartVisitSessionRequest {
   partySize: number
   itinerary: OptimizeItineraryRequest
 }
+
+export interface WalkingTimeEstimate {
+  parkId: number
+  fromAttractionId: number
+  fromAttractionName: string
+  toAttractionId: number
+  toAttractionName: string
+  status: 'Available' | 'CoordinatesUnavailable' | 'RouteUnavailable'
+  estimatedWalkingMinutes: number | null
+}

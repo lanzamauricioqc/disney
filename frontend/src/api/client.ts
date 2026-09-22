@@ -16,6 +16,7 @@ import type {
   SaveAdminLand,
   SaveAdminPark,
   WeekdayWaitTimePatternsResult,
+  WalkingTimeEstimate,
 } from './contracts'
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -134,6 +135,22 @@ export function skipVisitAttraction(
     `/api/v1/visit-sessions/${encodeURIComponent(sessionId)}` +
       `/stops/${attractionId}/skip`,
     { method: 'POST' },
+  )
+}
+
+export function estimateWalkingTime(
+  parkId: number,
+  fromAttractionId: number,
+  toAttractionId: number,
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams({
+    fromAttractionId: fromAttractionId.toString(),
+    toAttractionId: toAttractionId.toString(),
+  })
+  return getJson<WalkingTimeEstimate>(
+    `/api/v1/parks/${parkId}/walking-time?${query}`,
+    signal,
   )
 }
 

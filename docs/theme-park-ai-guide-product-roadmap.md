@@ -554,25 +554,25 @@ This should become the primary visitor experience during the park visit.
 
 ## User Stories
 
-### [MVP REQUIRED] Story 9.1 — Show next recommended attraction
+### [DONE] [MVP REQUIRED] Story 9.1 — Show next recommended attraction
 
 As a visitor,  
 I want one clear next recommendation,  
 so that I do not need to analyze the entire itinerary.
 
-### [MVP REQUIRED] Story 9.2 — Show current wait time
+### [DONE] [MVP REQUIRED] Story 9.2 — Show current wait time
 
 As a visitor,  
 I want to see the current queue for the recommended attraction,  
 so that I understand the immediate cost of the recommendation.
 
-### [MVP REQUIRED] Story 9.3 — Show walking time
+### [DONE] [MVP REQUIRED] Story 9.3 — Show walking time
 
 As a visitor,  
 I want to see the estimated walking time to the recommendation,  
 so that I can understand how far away it is.
 
-### [MVP REQUIRED] Story 9.4 — Show itinerary progress
+### [DONE] [MVP REQUIRED] Story 9.4 — Show itinerary progress
 
 As a visitor,  
 I want to see how many planned attractions I have completed,  

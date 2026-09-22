@@ -3,14 +3,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate } from 'react-router-dom'
 import {
   completeVisitAttraction,
+  estimateWalkingTime,
+  getCurrentWaitTimes,
   getParks,
   getVisitSession,
   skipVisitAttraction,
 } from '../../api/client'
-import type { VisitSessionStop } from '../../api/contracts'
+import type { CurrentWaitTime, VisitSessionStop } from '../../api/contracts'
 import { LanguageSelector, useI18n } from '../../i18n'
 import {
   clearVisitSessionId,
+  getFreshCurrentWaitForStop,
+  getLastCompletedStop,
+  getNextPendingStop,
   readVisitSessionId,
 } from './visitSessionModel'
 
@@ -30,6 +35,37 @@ export function ActiveVisit() {
     queryKey: ['parks'],
     queryFn: ({ signal }) => getParks(signal),
     staleTime: 30 * 60_000,
+  })
+  const activeParkId = sessionQuery.data?.parkId
+  const nextStopForQuery = sessionQuery.data
+    ? getNextPendingStop(sessionQuery.data)
+    : null
+  const lastCompletedStop = sessionQuery.data
+    ? getLastCompletedStop(sessionQuery.data)
+    : null
+  const waitsQuery = useQuery({
+    queryKey: ['current-waits', activeParkId],
+    queryFn: ({ signal }) => getCurrentWaitTimes(activeParkId!, signal),
+    enabled: activeParkId !== undefined,
+    refetchInterval: 30_000,
+  })
+  const walkingQuery = useQuery({
+    queryKey: [
+      'walking-time',
+      activeParkId,
+      lastCompletedStop?.attractionId,
+      nextStopForQuery?.attractionId,
+    ],
+    queryFn: ({ signal }) => estimateWalkingTime(
+      activeParkId!,
+      lastCompletedStop!.attractionId,
+      nextStopForQuery!.attractionId,
+      signal,
+    ),
+    enabled:
+      activeParkId !== undefined &&
+      lastCompletedStop !== null &&
+      nextStopForQuery !== null,
   })
   const updateStop = useMutation({
     mutationFn: ({ action, attractionId }: {
@@ -73,6 +109,15 @@ export function ActiveVisit() {
   const timeZone = park?.timezone ?? 'UTC'
   const completed = session.stops.filter(stop => stop.status === 'Completed').length
   const resolved = session.stops.filter(stop => stop.status !== 'Pending').length
+  const nextStop = getNextPendingStop(session)
+  const currentWait = nextStop
+    ? getFreshCurrentWaitForStop(waitsQuery.data?.attractions ?? [], nextStop)
+    : null
+  const walkingMinutes = lastCompletedStop
+    ? walkingQuery.data?.status === 'Available'
+      ? walkingQuery.data.estimatedWalkingMinutes
+      : null
+    : nextStop?.walkingMinutes ?? null
   const formatTime = (value: string) => new Intl.DateTimeFormat(locale, {
     hour: 'numeric',
     minute: '2-digit',
@@ -110,6 +155,34 @@ export function ActiveVisit() {
           </div>
         </section>
 
+        {nextStop ? (
+          <NextAction
+            busy={updateStop.isPending}
+            currentWait={currentWait}
+            formatTime={formatTime}
+            isWaitLoading={waitsQuery.isPending}
+            isWalkingLoading={lastCompletedStop !== null && walkingQuery.isPending}
+            onAction={(action) => updateStop.mutate({
+              action,
+              attractionId: nextStop.attractionId,
+            })}
+            stop={nextStop}
+            waitUnavailable={waitsQuery.isError}
+            walkingMinutes={walkingMinutes}
+            walkingUnavailable={
+              walkingQuery.isError ||
+              walkingQuery.data?.status === 'CoordinatesUnavailable' ||
+              walkingQuery.data?.status === 'RouteUnavailable'
+            }
+          />
+        ) : (
+          <section className="surface next-action-complete" role="status">
+            <p className="eyebrow">{t('nextAction')}</p>
+            <h2>{t('allVisitStopsResolved')}</h2>
+            <p>{t('allVisitStopsResolvedHelp')}</p>
+          </section>
+        )}
+
         <section className="surface itinerary-overview" aria-labelledby="visit-progress-title">
           <div className="itinerary-section-heading">
             <div>
@@ -139,13 +212,8 @@ export function ActiveVisit() {
           <ol className="itinerary-stop-list">
             {session.stops.map(stop => (
               <ActiveStop
-                busy={updateStop.isPending}
                 formatTime={formatTime}
                 key={stop.attractionId}
-                onAction={(action) => updateStop.mutate({
-                  action,
-                  attractionId: stop.attractionId,
-                })}
                 stop={stop}
               />
             ))}
@@ -165,15 +233,95 @@ export function ActiveVisit() {
   )
 }
 
-function ActiveStop({
+function NextAction({
   busy,
+  currentWait,
   formatTime,
+  isWaitLoading,
+  isWalkingLoading,
   onAction,
   stop,
+  waitUnavailable,
+  walkingMinutes,
+  walkingUnavailable,
 }: {
   busy: boolean
+  currentWait: CurrentWaitTime | null
   formatTime: (value: string) => string
+  isWaitLoading: boolean
+  isWalkingLoading: boolean
   onAction: (action: StopAction) => void
+  stop: VisitSessionStop
+  waitUnavailable: boolean
+  walkingMinutes: number | null
+  walkingUnavailable: boolean
+}) {
+  const { t } = useI18n()
+  const waitText = currentWait
+    ? currentWait.isOpen
+      ? currentWait.waitMinutes === null
+        ? t('openWithoutWait')
+        : t('liveWaitMinutes', { count: currentWait.waitMinutes })
+      : t('closed')
+    : isWaitLoading
+      ? t('loadingCurrentWait')
+      : t('currentWaitUnavailable')
+
+  return (
+    <section className="surface next-action-card" aria-labelledby="next-action-title">
+      <div className="next-action-heading">
+        <div>
+          <p className="eyebrow">{t('nextAction')}</p>
+          <h2 id="next-action-title">{stop.attractionName}</h2>
+          <p>{t('plannedFor', { time: formatTime(stop.attractionStartsAt) })}</p>
+        </div>
+        <span>{t('stopNumber', { number: stop.sequence })}</span>
+      </div>
+      <dl className="next-action-facts">
+        <div>
+          <dt>{t('currentWait')}</dt>
+          <dd>{waitUnavailable ? t('currentWaitUnavailable') : waitText}</dd>
+        </div>
+        <div>
+          <dt>{t('walkingTime')}</dt>
+          <dd>
+            {walkingUnavailable
+              ? t('walkingTimeUnavailable')
+              : isWalkingLoading
+                ? t('calculatingWalkingTime')
+                : walkingMinutes === null
+                  ? t('walkingTimeUnavailable')
+                  : t('durationMinutes', { count: walkingMinutes })}
+          </dd>
+        </div>
+      </dl>
+      <div className="next-action-controls">
+        <button
+          className="primary-button"
+          disabled={busy}
+          onClick={() => onAction('complete')}
+          type="button"
+        >
+          {t('markCompleted')}
+        </button>
+        <button
+          className="secondary-button"
+          disabled={busy}
+          onClick={() => onAction('skip')}
+          type="button"
+        >
+          {t('skipThisAttraction')}
+        </button>
+      </div>
+    </section>
+  )
+}
+
+function ActiveStop({
+  formatTime,
+  stop,
+}: {
+  formatTime: (value: string) => string
   stop: VisitSessionStop
 }) {
   const { t } = useI18n()
@@ -201,26 +349,6 @@ function ActiveStop({
               <dd><strong>{t('durationMinutes', { count: stop.queueMinutes })}</strong></dd>
             </div>
           </dl>
-          {stop.status === 'Pending' && (
-            <div className="visit-stop-actions">
-              <button
-                className="primary-button"
-                disabled={busy}
-                onClick={() => onAction('complete')}
-                type="button"
-              >
-                {t('markCompleted')}
-              </button>
-              <button
-                className="secondary-button"
-                disabled={busy}
-                onClick={() => onAction('skip')}
-                type="button"
-              >
-                {t('skipThisAttraction')}
-              </button>
-            </div>
-          )}
         </div>
       </article>
     </li>
