@@ -6,7 +6,7 @@ import {
   estimateWalkingTime,
   getCurrentWaitTimes,
   getParks,
-  getVisitSession,
+  replanVisitSession,
   skipVisitAttraction,
 } from '../../api/client'
 import type { CurrentWaitTime, VisitSessionStop } from '../../api/contracts'
@@ -27,8 +27,9 @@ export function ActiveVisit() {
   const sessionId = useMemo(readVisitSessionId, [])
   const sessionQuery = useQuery({
     queryKey: ['visit-session', sessionId],
-    queryFn: ({ signal }) => getVisitSession(sessionId!, signal),
+    queryFn: ({ signal }) => replanVisitSession(sessionId!, signal),
     enabled: sessionId !== null,
+    refetchInterval: 30_000,
     refetchOnWindowFocus: true,
   })
   const parksQuery = useQuery({

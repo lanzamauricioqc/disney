@@ -48,6 +48,23 @@ internal static class VisitSessionEndpoints
             .WithSummary("Gets persisted visit progress")
             .WithTags("Visit sessions");
 
+        endpoints.MapPost(
+                "/api/v1/visit-sessions/{sessionId:guid}/replan",
+                async (
+                    Guid sessionId,
+                    IVisitSessionService service,
+                    CancellationToken cancellationToken) =>
+                    await ExecuteAsync(async () =>
+                    {
+                        var session = await service.ReplanForCurrentConditionsAsync(
+                            sessionId,
+                            cancellationToken);
+                        return session is null ? Results.NotFound() : Results.Ok(session);
+                    }))
+            .WithName("ReplanVisitSession")
+            .WithSummary("Replans a visit after closures or material queue changes")
+            .WithTags("Visit sessions");
+
         MapStopAction(
             endpoints,
             "complete",

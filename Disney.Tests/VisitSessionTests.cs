@@ -90,6 +90,7 @@ public sealed class VisitSessionTests
         Assert.Equal(VisitSessionStatus.Completed, result.Status);
         Assert.Equal(VisitSessionStopStatus.Completed, result.Stops[0].Status);
         Assert.Equal(Now, result.Stops[0].StatusChangedAt);
+        Assert.Equal(0, store.ReplaceCount);
     }
 
     [Fact]
@@ -107,6 +108,124 @@ public sealed class VisitSessionTests
         Assert.NotNull(result);
         Assert.Equal(VisitSessionStatus.Active, result.Status);
         Assert.Equal(VisitSessionStopStatus.Skipped, result.Stops[0].Status);
+        Assert.Equal(1, store.ReplaceCount);
+        Assert.Equal(102, result.Stops.Single(
+            stop => stop.Status == VisitSessionStopStatus.Pending).AttractionId);
+    }
+
+    [Fact]
+    public async Task CompleteAttraction_ReplansRemainingStopsFromCurrentLocation()
+    {
+        var session = CreateSession();
+        var store = new FakeVisitSessionStore { Session = session };
+        var optimizationService = new FakeOptimizationService(
+            CreateItinerary(),
+            filterToRequestedAttractions: true);
+        var service = CreateService(store, optimizationService);
+
+        var result = await service.CompleteAttractionAsync(
+            session.Id,
+            101,
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(1, store.ReplaceCount);
+        Assert.Equal(101, optimizationService.Command!.StartingAttractionId);
+        Assert.Equal(session.VisitStartAt, optimizationService.Command.VisitStartAt);
+        Assert.Equal(
+            [102L],
+            optimizationService.Command.Preferences.Select(
+                preference => preference.AttractionId));
+        Assert.Equal(
+            [101L, 102L],
+            result.Stops.Select(stop => stop.AttractionId));
+    }
+
+    [Fact]
+    public async Task CurrentConditions_ReplansWhenAttractionCloses()
+    {
+        var session = CreateSession();
+        var store = new FakeVisitSessionStore { Session = session };
+        var replanned = CreateItinerary() with
+        {
+            Stops = [CreateItinerary().Stops[1]],
+            UnscheduledAttractions =
+            [
+                new UnscheduledAttraction(
+                    101,
+                    AttractionPreferenceLevel.MustDo,
+                    UnscheduledAttractionReason.AttractionClosed)
+            ]
+        };
+        var service = CreateService(
+            store,
+            new FakeOptimizationService(replanned));
+
+        var result = await service.ReplanForCurrentConditionsAsync(
+            session.Id,
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(1, store.ReplaceCount);
+        Assert.Equal([102L], result.Stops.Select(stop => stop.AttractionId));
+    }
+
+    [Fact]
+    public async Task CurrentConditions_ReplansAfterMaterialQueueChange()
+    {
+        var session = CreateSession();
+        var store = new FakeVisitSessionStore { Session = session };
+        var itinerary = CreateItinerary();
+        var changedStops = itinerary.Stops
+            .Select(stop => stop.AttractionId == 101
+                ? stop with
+                {
+                    QueueMinutes =
+                        stop.QueueMinutes +
+                        VisitSessionService.MaterialQueueChangeMinutes
+                }
+                : stop)
+            .Reverse()
+            .Select((stop, index) => stop with { Sequence = index + 1 })
+            .ToArray();
+        var service = CreateService(
+            store,
+            new FakeOptimizationService(itinerary with { Stops = changedStops }));
+
+        var result = await service.ReplanForCurrentConditionsAsync(
+            session.Id,
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(1, store.ReplaceCount);
+        Assert.Equal([102L, 101L], result.Stops.Select(stop => stop.AttractionId));
+    }
+
+    [Fact]
+    public async Task CurrentConditions_PreservesStablePlanAfterMinorQueueChange()
+    {
+        var session = CreateSession();
+        var store = new FakeVisitSessionStore { Session = session };
+        var itinerary = CreateItinerary();
+        var changedStops = itinerary.Stops
+            .Select(stop => stop with
+            {
+                QueueMinutes =
+                    stop.QueueMinutes +
+                    VisitSessionService.MaterialQueueChangeMinutes -
+                    1
+            })
+            .ToArray();
+        var service = CreateService(
+            store,
+            new FakeOptimizationService(itinerary with { Stops = changedStops }));
+
+        var result = await service.ReplanForCurrentConditionsAsync(
+            session.Id,
+            CancellationToken.None);
+
+        Assert.Same(session, result);
+        Assert.Equal(0, store.ReplaceCount);
     }
 
     [Fact]
@@ -217,7 +336,9 @@ public sealed class VisitSessionTests
         FakeVisitSessionStore? store = null,
         FakeOptimizationService? optimizationService = null) =>
         new(
-            optimizationService ?? new FakeOptimizationService(CreateItinerary()),
+            optimizationService ?? new FakeOptimizationService(
+                CreateItinerary(),
+                filterToRequestedAttractions: true),
             store ?? new FakeVisitSessionStore(),
             new FixedTimeProvider(Now));
 
@@ -303,7 +424,9 @@ public sealed class VisitSessionTests
             null,
             [new ItineraryPreference(101, AttractionPreferenceLevel.MustDo)]);
 
-    private sealed class FakeOptimizationService(OptimizedItineraryResult result)
+    private sealed class FakeOptimizationService(
+        OptimizedItineraryResult result,
+        bool filterToRequestedAttractions = false)
         : IItineraryOptimizationService
     {
         public long ParkId { get; private set; }
@@ -316,7 +439,24 @@ public sealed class VisitSessionTests
         {
             ParkId = parkId;
             Command = command;
-            return Task.FromResult(result);
+            if (!filterToRequestedAttractions)
+            {
+                return Task.FromResult(result);
+            }
+
+            var requestedIds = command.Preferences
+                .Select(preference => preference.AttractionId)
+                .ToHashSet();
+            var stops = result.Stops
+                .Where(stop => requestedIds.Contains(stop.AttractionId))
+                .Select((stop, index) => stop with { Sequence = index + 1 })
+                .ToArray();
+            return Task.FromResult(result with
+            {
+                VisitStartAt = command.VisitStartAt,
+                VisitEndAt = command.VisitEndAt,
+                Stops = stops
+            });
         }
     }
 
@@ -325,6 +465,7 @@ public sealed class VisitSessionTests
         public VisitSession? Session { get; set; }
         public VisitSessionStopStatus? SimulatedConcurrentStatus { get; init; }
         public int UpdateCount { get; private set; }
+        public int ReplaceCount { get; private set; }
 
         public Task CreateAsync(
             VisitSession session,
@@ -369,6 +510,43 @@ public sealed class VisitSessionTests
                 Stops = updatedStops
             };
             return Task.FromResult(SimulatedConcurrentStatus is null);
+        }
+
+        public Task<bool> TryReplacePendingStopsAsync(
+            Guid sessionId,
+            DateTimeOffset expectedUpdatedAt,
+            IReadOnlyList<VisitSessionStop> pendingStops,
+            int totalWalkingMinutes,
+            int totalQueueMinutes,
+            int totalAttractionMinutes,
+            string algorithmVersion,
+            DateTimeOffset changedAt,
+            CancellationToken cancellationToken)
+        {
+            ReplaceCount++;
+            if (Session?.Id != sessionId || Session.UpdatedAt != expectedUpdatedAt)
+            {
+                return Task.FromResult(false);
+            }
+
+            var resolvedStops = Session.Stops
+                .Where(stop => stop.Status != VisitSessionStopStatus.Pending);
+            var stops = resolvedStops.Concat(pendingStops)
+                .OrderBy(stop => stop.Sequence)
+                .ToArray();
+            Session = Session with
+            {
+                UpdatedAt = changedAt,
+                Status = pendingStops.Count == 0
+                    ? VisitSessionStatus.Completed
+                    : VisitSessionStatus.Active,
+                Stops = stops,
+                TotalWalkingMinutes = totalWalkingMinutes,
+                TotalQueueMinutes = totalQueueMinutes,
+                TotalAttractionMinutes = totalAttractionMinutes,
+                AlgorithmVersion = algorithmVersion
+            };
+            return Task.FromResult(true);
         }
     }
 

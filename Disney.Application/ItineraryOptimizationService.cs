@@ -7,7 +7,7 @@ public sealed class ItineraryOptimizationService(
 {
     private const int DefaultAttractionDurationMinutes = 10;
     private const int HistoricalLookbackMonths = 3;
-    private const string AlgorithmVersion = "priority-live-history-walking-greedy-v2";
+    private const string AlgorithmVersion = "priority-live-history-walking-greedy-v3";
     public static readonly TimeSpan MaximumVisitWindow = TimeSpan.FromDays(1);
 
     public async Task<OptimizedItineraryResult> GenerateAsync(
@@ -22,6 +22,8 @@ public sealed class ItineraryOptimizationService(
         var candidates = await candidateReader.GetCandidatesAsync(
             parkId,
             preferencesByAttraction.Keys.ToArray(),
+            generatedAt.Subtract(QueueDataFreshness.MaximumLiveObservationAge),
+            generatedAt,
             command.VisitStartAt,
             generatedAt.AddMonths(-HistoricalLookbackMonths),
             generatedAt,

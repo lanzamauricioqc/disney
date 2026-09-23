@@ -70,6 +70,8 @@ public interface IItineraryCandidateReader
     Task<IReadOnlyList<ItineraryCandidate>> GetCandidatesAsync(
         long parkId,
         IReadOnlyCollection<long> attractionIds,
+        DateTimeOffset liveObservationFrom,
+        DateTimeOffset liveObservationTo,
         DateTimeOffset historicalTargetAt,
         DateTimeOffset historicalWindowStart,
         DateTimeOffset historicalWindowEnd,

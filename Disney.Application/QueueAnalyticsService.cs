@@ -15,13 +15,15 @@ public sealed class QueueAnalyticsService(
         CancellationToken cancellationToken)
     {
         ValidateParkId(parkId);
-        var window = CreateWindow();
+        var windowEnd = timeProvider.GetUtcNow();
+        var windowStart = windowEnd.Subtract(
+            QueueDataFreshness.MaximumLiveObservationAge);
         var waits = await reader.GetCurrentWaitTimesAsync(
             parkId,
-            window.From,
-            window.To,
+            windowStart,
+            windowEnd,
             cancellationToken);
-        return new CurrentWaitTimesResult(parkId, window.From, window.To, waits);
+        return new CurrentWaitTimesResult(parkId, windowStart, windowEnd, waits);
     }
 
     public async Task<WeekdayWaitTimePatternsResult> GetWeekdayWaitTimePatternsAsync(

@@ -341,10 +341,36 @@ public sealed class InfrastructureTests
             "attraction.duration_minutes::integer AS DurationMinutes",
             readerSourceCode);
         Assert.Contains("observation.is_valid", readerSourceCode);
+        Assert.Contains(
+            "observation.observed_at >= @LiveObservationFrom",
+            readerSourceCode);
+        Assert.Contains(
+            "observation.observed_at <= @LiveObservationTo",
+            readerSourceCode);
         Assert.Contains("ORDER BY observation.observed_at DESC", readerSourceCode);
         Assert.Contains("LIMIT 1", readerSourceCode);
         Assert.Contains("attraction.id = ANY(@AttractionIds)", readerSourceCode);
         Assert.Contains("park.is_active", readerSourceCode);
+    }
+
+    [Fact]
+    public void VisitSessionStore_ReplacesPendingPlanTransactionally()
+    {
+        var storePath = Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Disney.Infrastructure",
+            "PostgreSqlVisitSessionStore.cs");
+        var sourceCode = File.ReadAllText(Path.GetFullPath(storePath));
+
+        Assert.Contains("FOR UPDATE", sourceCode);
+        Assert.Contains("updated_at = @ExpectedUpdatedAt", sourceCode);
+        Assert.Contains("DELETE FROM public.visit_session_stops", sourceCode);
+        Assert.Contains("status = 'Pending'", sourceCode);
+        Assert.Contains("total_queue_minutes = @TotalQueueMinutes", sourceCode);
     }
 
     private sealed class StubHandler(HttpStatusCode statusCode, string content)

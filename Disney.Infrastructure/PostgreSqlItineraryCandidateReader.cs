@@ -9,6 +9,8 @@ internal sealed class PostgreSqlItineraryCandidateReader(
     public async Task<IReadOnlyList<ItineraryCandidate>> GetCandidatesAsync(
         long parkId,
         IReadOnlyCollection<long> attractionIds,
+        DateTimeOffset liveObservationFrom,
+        DateTimeOffset liveObservationTo,
         DateTimeOffset historicalTargetAt,
         DateTimeOffset historicalWindowStart,
         DateTimeOffset historicalWindowEnd,
@@ -35,6 +37,8 @@ internal sealed class PostgreSqlItineraryCandidateReader(
                     WHERE observation.attraction_id = attraction.id
                       AND observation.park_id = park.id
                       AND observation.is_valid
+                      AND observation.observed_at >= @LiveObservationFrom
+                      AND observation.observed_at <= @LiveObservationTo
                     ORDER BY observation.observed_at DESC
                     LIMIT 1
                 ) latest_observation ON TRUE
@@ -76,6 +80,8 @@ internal sealed class PostgreSqlItineraryCandidateReader(
                 {
                     ParkId = parkId,
                     AttractionIds = attractionIds.ToArray(),
+                    LiveObservationFrom = liveObservationFrom,
+                    LiveObservationTo = liveObservationTo,
                     HistoricalTargetAt = historicalTargetAt,
                     HistoricalWindowStart = historicalWindowStart,
                     HistoricalWindowEnd = historicalWindowEnd

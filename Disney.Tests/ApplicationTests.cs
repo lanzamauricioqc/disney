@@ -138,7 +138,7 @@ public sealed class ApplicationTests
     }
 
     [Fact]
-    public async Task AnalyticsService_UsesTrailingThreeMonthWindow()
+    public async Task AnalyticsService_UsesFreshCurrentAndTrailingAnalyticsWindows()
     {
         var currentTime = new DateTimeOffset(2026, 8, 18, 22, 0, 0, TimeSpan.Zero);
         var analyticsReader = new FakeQueueAnalyticsReader();
@@ -162,8 +162,12 @@ public sealed class ApplicationTests
             null,
             CancellationToken.None);
 
-        Assert.Equal(currentTime.AddMonths(-3), currentWaitTimes.WindowStart);
+        Assert.Equal(
+            currentTime.Subtract(QueueDataFreshness.MaximumLiveObservationAge),
+            currentWaitTimes.WindowStart);
         Assert.Equal(currentTime, currentWaitTimes.GeneratedAt);
+        Assert.Equal(currentWaitTimes.WindowStart, analyticsReader.CurrentWaitsFrom);
+        Assert.Equal(currentTime, analyticsReader.CurrentWaitsTo);
         Assert.Equal(currentTime.AddMonths(-3), waitTimePatterns.WindowStart);
         Assert.Equal(currentTime, waitTimePatterns.WindowEnd);
         Assert.Equal(currentTime.AddMonths(-3), dailyHistory.WindowStart);
@@ -701,7 +705,7 @@ public sealed class ApplicationTests
         Assert.Equal(85, result.TotalQueueMinutes);
         Assert.Equal(45, result.TotalAttractionMinutes);
         Assert.Equal(generatedAt, result.GeneratedAt);
-        Assert.Equal("priority-live-history-walking-greedy-v2", result.AlgorithmVersion);
+        Assert.Equal("priority-live-history-walking-greedy-v3", result.AlgorithmVersion);
         Assert.Empty(result.UnscheduledAttractions);
     }
 
@@ -734,6 +738,11 @@ public sealed class ApplicationTests
 
         Assert.Equal([2L, 3L, 1L], result.Stops.Select(stop => stop.AttractionId));
         Assert.Equal([20, 25, 35], result.Stops.Select(stop => stop.QueueMinutes));
+        Assert.Equal(
+            generatedAt.Subtract(
+                QueueDataFreshness.MaximumLiveObservationAge),
+            candidateReader.LiveObservationFrom);
+        Assert.Equal(generatedAt, candidateReader.LiveObservationTo);
         Assert.Equal(visitStart, candidateReader.HistoricalTargetAt);
         Assert.Equal(generatedAt.AddMonths(-3), candidateReader.HistoricalWindowStart);
         Assert.Equal(generatedAt, candidateReader.HistoricalWindowEnd);
@@ -1040,13 +1049,19 @@ public sealed class ApplicationTests
         public DateTimeOffset? ToExclusive { get; private set; }
         public DateOnly? DailyParksFromInclusive { get; private set; }
         public DateOnly? DailyParksToExclusive { get; private set; }
+        public DateTimeOffset? CurrentWaitsFrom { get; private set; }
+        public DateTimeOffset? CurrentWaitsTo { get; private set; }
 
         public Task<IReadOnlyList<CurrentWaitTime>> GetCurrentWaitTimesAsync(
             long parkId,
             DateTimeOffset from,
             DateTimeOffset to,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<CurrentWaitTime>>([]);
+            CancellationToken cancellationToken)
+        {
+            CurrentWaitsFrom = from;
+            CurrentWaitsTo = to;
+            return Task.FromResult<IReadOnlyList<CurrentWaitTime>>([]);
+        }
 
         public Task<IReadOnlyList<WeekdayWaitTimePattern>> GetWeekdayWaitTimePatternsAsync(
             long parkId,
@@ -1143,15 +1158,21 @@ public sealed class ApplicationTests
         public DateTimeOffset? HistoricalTargetAt { get; private set; }
         public DateTimeOffset? HistoricalWindowStart { get; private set; }
         public DateTimeOffset? HistoricalWindowEnd { get; private set; }
+        public DateTimeOffset? LiveObservationFrom { get; private set; }
+        public DateTimeOffset? LiveObservationTo { get; private set; }
 
         public Task<IReadOnlyList<ItineraryCandidate>> GetCandidatesAsync(
             long parkId,
             IReadOnlyCollection<long> attractionIds,
+            DateTimeOffset liveObservationFrom,
+            DateTimeOffset liveObservationTo,
             DateTimeOffset historicalTargetAt,
             DateTimeOffset historicalWindowStart,
             DateTimeOffset historicalWindowEnd,
             CancellationToken cancellationToken)
         {
+            LiveObservationFrom = liveObservationFrom;
+            LiveObservationTo = liveObservationTo;
             HistoricalTargetAt = historicalTargetAt;
             HistoricalWindowStart = historicalWindowStart;
             HistoricalWindowEnd = historicalWindowEnd;

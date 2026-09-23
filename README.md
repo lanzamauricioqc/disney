@@ -37,6 +37,11 @@ GET /api/v1/parks/{parkId}/analytics/closures/weekday-quarter-hourly
 GET /api/v1/parks/{parkId}/attractions/{attractionId}/wait-time-prediction?at={timestamp}
 GET /api/v1/parks/{parkId}/walking-time?fromAttractionId={id}&toAttractionId={id}
 POST /api/v1/parks/{parkId}/itineraries/optimize
+POST /api/v1/parks/{parkId}/visit-sessions
+GET /api/v1/visit-sessions/{sessionId}
+POST /api/v1/visit-sessions/{sessionId}/replan
+POST /api/v1/visit-sessions/{sessionId}/stops/{attractionId}/complete
+POST /api/v1/visit-sessions/{sessionId}/stops/{attractionId}/skip
 POST /api/v1/waitlist
 GET /api/v1/billing/products
 POST /api/v1/billing/checkout-sessions
@@ -70,6 +75,14 @@ walking speed and identify the route source and algorithm version in the respons
 The initial itinerary optimizer accepts a visit window and attraction preferences.
 It returns deterministic scheduled stops with walking, queue, and attraction timing,
 plus explicit reasons for attractions that could not be scheduled.
+Only valid observations from the preceding 15 minutes are returned as current waits
+or treated as live optimizer queue and availability data. Older observations are
+ignored as live inputs, while the optimizer can still use the three-month historical
+estimate for the matching time slot.
+
+Active visit sessions replan their remaining stops immediately after completion or
+skip actions. The visitor client also checks every 30 seconds; the server persists a
+new plan when an attraction closes or a planned queue changes by at least 15 minutes.
 
 The analytics endpoints group local park time into 15-minute buckets and return
 `localHour` and `localMinute`. They accept an optional `attractionId` query parameter.

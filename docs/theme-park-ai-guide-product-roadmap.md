@@ -594,25 +594,25 @@ A static itinerary will quickly become obsolete. Replanning is therefore part of
 
 ## User Stories
 
-### [MVP REQUIRED] Story 10.1 — Recalculate after attraction completion
+### [DONE] [MVP REQUIRED] Story 10.1 — Recalculate after attraction completion
 
 As a visitor,  
 I want the remaining itinerary recalculated after completing an attraction,  
 so that the next recommendation reflects my current state.
 
-### [MVP REQUIRED] Story 10.2 — Recalculate after skip
+### [DONE] [MVP REQUIRED] Story 10.2 — Recalculate after skip
 
 As a visitor,  
 I want the itinerary recalculated when I skip an attraction,  
 so that the remaining time can be used efficiently.
 
-### [MVP REQUIRED] Story 10.3 — Recalculate after closure
+### [DONE] [MVP REQUIRED] Story 10.3 — Recalculate after closure
 
 As a visitor,  
 I want my itinerary automatically updated if a planned attraction closes,  
 so that I am not sent toward an unavailable ride.
 
-### [MVP REQUIRED] Story 10.4 — Recalculate after major queue changes
+### [DONE] [MVP REQUIRED] Story 10.4 — Recalculate after major queue changes
 
 As a visitor,  
 I want the itinerary adjusted when queue conditions materially change,  

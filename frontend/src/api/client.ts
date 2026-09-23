@@ -116,6 +116,13 @@ export function getVisitSession(sessionId: string, signal?: AbortSignal) {
   )
 }
 
+export function replanVisitSession(sessionId: string, signal?: AbortSignal) {
+  return requestJson<VisitSession>(
+    `/api/v1/visit-sessions/${encodeURIComponent(sessionId)}/replan`,
+    { method: 'POST', signal },
+  )
+}
+
 export function completeVisitAttraction(
   sessionId: string,
   attractionId: number,

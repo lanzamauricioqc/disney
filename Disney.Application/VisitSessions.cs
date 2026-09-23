@@ -61,6 +61,17 @@ public interface IVisitSessionStore
         VisitSessionStopStatus status,
         DateTimeOffset changedAt,
         CancellationToken cancellationToken);
+
+    Task<bool> TryReplacePendingStopsAsync(
+        Guid sessionId,
+        DateTimeOffset expectedUpdatedAt,
+        IReadOnlyList<VisitSessionStop> pendingStops,
+        int totalWalkingMinutes,
+        int totalQueueMinutes,
+        int totalAttractionMinutes,
+        string algorithmVersion,
+        DateTimeOffset changedAt,
+        CancellationToken cancellationToken);
 }
 
 public interface IVisitSessionService
@@ -82,5 +93,9 @@ public interface IVisitSessionService
     Task<VisitSession?> SkipAttractionAsync(
         Guid sessionId,
         long attractionId,
+        CancellationToken cancellationToken);
+
+    Task<VisitSession?> ReplanForCurrentConditionsAsync(
+        Guid sessionId,
         CancellationToken cancellationToken);
 }
