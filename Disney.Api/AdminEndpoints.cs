@@ -1,4 +1,5 @@
 using Disney.Application;
+using Disney.Domain;
 using Microsoft.AspNetCore.OutputCaching;
 
 namespace Disney.Api;
@@ -413,13 +414,31 @@ internal static class AdminEndpoints
                 "durationMinutes",
                 "Duration must be positive when provided.");
         }
-        if (request.Latitude is < -90 or > 90 || request.Longitude is < -180 or > 180)
+        if (!AreCoordinatesValid(request.Latitude, request.Longitude))
         {
             return ValidationProblem(
                 "coordinates",
                 "Coordinates are outside their valid ranges.");
         }
         return null;
+    }
+
+    private static bool AreCoordinatesValid(decimal? latitude, decimal? longitude)
+    {
+        if (latitude is null && longitude is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            _ = new GeoCoordinate(latitude ?? 0, longitude ?? 0);
+            return true;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return false;
+        }
     }
 
     private static IResult? ValidateManualObservation(
@@ -445,10 +464,7 @@ internal static class AdminEndpoints
     }
 
     private static IResult ValidationProblem(string field, string message) =>
-        Results.ValidationProblem(new Dictionary<string, string[]>
-        {
-            [field] = [message]
-        });
+        EndpointResults.ValidationProblem(field, message);
 
     private static async Task EvictPublicDataAsync(
         IOutputCacheStore outputCache,

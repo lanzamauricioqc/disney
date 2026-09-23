@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Dapper;
 using Disney.Application;
+using Disney.Domain;
 using Microsoft.AspNetCore.Identity;
 
 namespace Disney.Infrastructure;
@@ -39,7 +40,7 @@ internal sealed class CompanySecretService : ICompanySecretService
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(secret)));
 
     public string GetPrefix(string secret) =>
-        secret[..Math.Min(secret.Length, 12)];
+        CompanyApiKeyRules.GetPrefix(secret);
 
     private static string Base64UrlEncode(byte[] value) =>
         Convert.ToBase64String(value)

@@ -173,3 +173,10 @@ public sealed class CheckoutService(
 }
 
 public sealed class PaymentConfigurationException(string message) : Exception(message);
+
+/// <summary>
+/// Raised when a payment provider rejects a webhook payload or signature, so
+/// callers never need to reference a provider-specific exception type.
+/// </summary>
+public sealed class PaymentValidationException(string message, Exception innerException)
+    : Exception(message, innerException);

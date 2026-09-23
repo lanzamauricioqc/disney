@@ -43,20 +43,9 @@ public sealed class VisitSessionService(
             startedAt,
             startedAt,
             VisitSessionStatus.Active,
-            itinerary.Stops.Select(stop => new VisitSessionStop(
-                stop.Sequence,
-                stop.AttractionId,
-                stop.AttractionName,
-                stop.Preference,
-                stop.TravelStartsAt,
-                stop.WalkingMinutes,
-                stop.QueueStartsAt,
-                stop.QueueMinutes,
-                stop.AttractionStartsAt,
-                stop.AttractionDurationMinutes,
-                stop.CompletesAt,
-                VisitSessionStopStatus.Pending,
-                null)).ToArray(),
+            itinerary.Stops
+                .Select(stop => VisitSessionStop.CreatePending(stop, stop.Sequence))
+                .ToArray(),
             itinerary.TotalWalkingMinutes,
             itinerary.TotalQueueMinutes,
             itinerary.TotalAttractionMinutes,
@@ -112,12 +101,7 @@ public sealed class VisitSessionService(
         CancellationToken cancellationToken)
     {
         ValidateSessionId(sessionId);
-        if (attractionId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(attractionId),
-                "Attraction ID must be greater than zero.");
-        }
+        RequestGuard.RequireAttractionIdentifier(attractionId);
 
         var session = await store.GetAsync(sessionId, cancellationToken);
         if (session is null)
@@ -214,20 +198,8 @@ public sealed class VisitSessionService(
             .DefaultIfEmpty(0)
             .Max();
         var replacementStops = itinerary.Stops
-            .Select((stop, index) => new VisitSessionStop(
-                nextSequence + index + 1,
-                stop.AttractionId,
-                stop.AttractionName,
-                stop.Preference,
-                stop.TravelStartsAt,
-                stop.WalkingMinutes,
-                stop.QueueStartsAt,
-                stop.QueueMinutes,
-                stop.AttractionStartsAt,
-                stop.AttractionDurationMinutes,
-                stop.CompletesAt,
-                VisitSessionStopStatus.Pending,
-                null))
+            .Select((stop, index) =>
+                VisitSessionStop.CreatePending(stop, nextSequence + index + 1))
             .ToArray();
         var retainedStops = resolvedStops
             .Where(stop => stop.Status == VisitSessionStopStatus.Completed)

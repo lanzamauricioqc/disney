@@ -5,6 +5,9 @@ namespace Disney.Api;
 
 internal static class QueueAnalyticsEndpoints
 {
+    private const string AttractionIdentifierRequired =
+        "Attraction ID must be greater than zero.";
+
     public static IEndpointRouteBuilder MapQueueAnalyticsEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
@@ -28,10 +31,11 @@ internal static class QueueAnalyticsEndpoints
                 DateOnly? weekStart,
                 IQueueAnalyticsService analyticsService,
                 CancellationToken cancellationToken) =>
-                await ExecuteDailyParkWaitTimesQuery(
+                await EndpointResults.ExecuteOkAsync(
                     () => analyticsService.GetDailyParkWaitTimesAsync(
                         weekStart,
-                        cancellationToken)))
+                        cancellationToken),
+                    "weekStart"))
             .WithName("GetDailyParkWaitTimes")
             .WithSummary("Compares daily average wait times across parks for one week")
             .WithTags("Queue analytics")
@@ -148,10 +152,9 @@ internal static class QueueAnalyticsEndpoints
     {
         if (attractionId <= 0)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["attractionId"] = ["Attraction id must be greater than zero."]
-            });
+            return EndpointResults.ValidationProblem(
+                "attractionId",
+                AttractionIdentifierRequired);
         }
 
         return Results.Ok(await execute());
@@ -167,7 +170,7 @@ internal static class QueueAnalyticsEndpoints
 
         if (attractionId <= 0)
         {
-            errors["attractionId"] = ["Attraction id must be greater than zero."];
+            errors["attractionId"] = [AttractionIdentifierRequired];
         }
 
         if (from >= to)
@@ -189,21 +192,5 @@ internal static class QueueAnalyticsEndpoints
         }
 
         return Results.Ok(await execute());
-    }
-
-    private static async Task<IResult> ExecuteDailyParkWaitTimesQuery<T>(
-        Func<Task<T>> execute)
-    {
-        try
-        {
-            return Results.Ok(await execute());
-        }
-        catch (ArgumentException exception)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["weekStart"] = [exception.Message]
-            });
-        }
     }
 }

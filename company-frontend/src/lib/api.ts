@@ -1,6 +1,8 @@
 import type { ApiErrorInfo } from "../types";
+import { getAccessToken } from "./session";
 
 const BASE = "/api/v1/company";
+const authorizationScheme = "Bearer";
 let unauthorizedHandler: (() => void) | undefined;
 export function onUnauthorized(handler: () => void) { unauthorizedHandler = handler; return () => { if (unauthorizedHandler === handler) unauthorizedHandler = undefined; }; }
 export class ApiError extends Error { constructor(public info: ApiErrorInfo) { super(info.detail); this.name = "ApiError"; } }
@@ -14,10 +16,10 @@ function errorMessage(body: unknown, fallback: string): { title: string; detail:
 }
 
 export async function api<T = unknown>(path: string, options: RequestInit = {}, authenticated = true): Promise<T> {
-  const token = sessionStorage.getItem("parkPilotCompanyToken");
+  const token = getAccessToken();
   const headers = new Headers(options.headers); headers.set("Accept", "application/json");
   if (options.body && !(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
-  if (authenticated && token) headers.set("Authorization", `Bearer ${token}`);
+  if (authenticated && token) headers.set("Authorization", `${authorizationScheme} ${token}`);
   let response: Response;
   try { response = await fetch(`${BASE}${path}`, { ...options, headers }); } catch (error) { throw new ApiError({ status: 0, title: "Server unavailable", detail: "Could not reach the Park Pilot company API. Confirm the API proxy and server configuration.", body: error instanceof Error ? error.message : error }); }
   const body = await parse(response);
@@ -31,3 +33,14 @@ export const post = <T>(path: string, value?: unknown, authenticated = true) => 
 export const put = <T>(path: string, value: unknown) => api<T>(path, { method: "PUT", body: JSON.stringify(value) });
 export const patch = <T>(path: string, value: unknown) => api<T>(path, { method: "PATCH", body: JSON.stringify(value) });
 export const remove = <T>(path: string) => api<T>(path, { method: "DELETE" });
+
+export async function download(path: string, accept: string): Promise<Blob> {
+  const headers = new Headers({ Accept: accept });
+  const token = getAccessToken();
+  if (token) headers.set("Authorization", `${authorizationScheme} ${token}`);
+  let response: Response;
+  try { response = await fetch(`${BASE}${path}`, { headers }); } catch (error) { throw new ApiError({ status: 0, title: "Server unavailable", detail: "Could not reach the Park Pilot company API. Confirm the API proxy and server configuration.", body: error instanceof Error ? error.message : error }); }
+  if (response.status === 401) unauthorizedHandler?.();
+  if (!response.ok) { const info = errorMessage(await parse(response), `Request failed (${response.status})`); throw new ApiError({ status: response.status, ...info }); }
+  return response.blob();
+}

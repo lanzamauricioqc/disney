@@ -14,32 +14,17 @@ internal static class ItineraryOptimizationEndpoints
                     GenerateItineraryRequest request,
                     IItineraryOptimizationService optimizationService,
                     CancellationToken cancellationToken) =>
-                    await ExecuteAsync(
+                    await EndpointResults.ExecuteOkAsync(
                         () => optimizationService.GenerateAsync(
                             parkId,
                             request.ToCommand(),
-                            cancellationToken)))
+                            cancellationToken),
+                        "itinerary"))
             .WithName("GenerateOptimizedItinerary")
             .WithSummary("Generates an ordered itinerary for a park visit")
             .WithTags("Itinerary optimization");
 
         return endpoints;
-    }
-
-    private static async Task<IResult> ExecuteAsync(
-        Func<Task<OptimizedItineraryResult>> execute)
-    {
-        try
-        {
-            return Results.Ok(await execute());
-        }
-        catch (ArgumentException exception)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                [exception.ParamName ?? "itinerary"] = [exception.Message]
-            });
-        }
     }
 
     internal sealed record GenerateItineraryRequest(

@@ -566,31 +566,23 @@ internal sealed partial class PostgreSqlCompanyRepository
                 cancellationToken: cancellationToken));
         }
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            """
-            INSERT INTO public.company_audit_logs
-                (organization_id, actor_user_id, action, entity_type, entity_id,
-                 details_json, created_at)
-            VALUES
-                (@OrganizationId, NULL, 'integration.reservation_upserted',
-                 'visit', @VisitId::text,
-                 jsonb_build_object(
-                    'customer_created', @CustomerCreated,
-                    'visit_created', @VisitCreated,
-                    'reservation_external_reference', @ExternalReference),
-                 @ImportedAt);
-            """,
+        await WriteAuditAsync(
+            connection,
+            transaction,
+            organizationId,
+            null,
+            "integration.reservation_upserted",
+            "visit",
+            visitId.ToString(),
             new
             {
-                OrganizationId = organizationId,
-                VisitId = visitId,
-                CustomerCreated = customerCreated,
-                VisitCreated = visitCreated,
-                ExternalReference = reservation.ReservationExternalReference.Trim(),
-                ImportedAt = importedAt
+                customer_created = customerCreated,
+                visit_created = visitCreated,
+                reservation_external_reference =
+                    reservation.ReservationExternalReference.Trim()
             },
-            transaction,
-            cancellationToken: cancellationToken));
+            importedAt,
+            cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new ReservationImportResult(
             customerId,

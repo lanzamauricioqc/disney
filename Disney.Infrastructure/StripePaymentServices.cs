@@ -29,6 +29,53 @@ internal sealed class CompanyCreditBundleOptions
     public string? DisplayPrice { get; init; }
 }
 
+internal static class StripeCheckoutSession
+{
+    public static async Task<Session> CreateAsync(
+        string secretKey,
+        string priceId,
+        string customerEmail,
+        string successUrl,
+        string cancelUrl,
+        Dictionary<string, string> metadata,
+        CancellationToken cancellationToken)
+    {
+        var sessionService = new SessionService(new StripeClient(secretKey));
+        var session = await sessionService.CreateAsync(
+            new SessionCreateOptions
+            {
+                Mode = "payment",
+                CustomerEmail = customerEmail,
+                SuccessUrl = AppendSessionPlaceholder(successUrl),
+                CancelUrl = cancelUrl,
+                LineItems =
+                [
+                    new SessionLineItemOptions
+                    {
+                        Price = priceId,
+                        Quantity = 1
+                    }
+                ],
+                Metadata = metadata
+            },
+            cancellationToken: cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(session.Url))
+        {
+            throw new InvalidOperationException(
+                "Stripe created a Checkout Session without a redirect URL.");
+        }
+
+        return session;
+    }
+
+    private static string AppendSessionPlaceholder(string successUrl)
+    {
+        var separator = successUrl.Contains('?', StringComparison.Ordinal) ? "&" : "?";
+        return $"{successUrl}{separator}session_id={{CHECKOUT_SESSION_ID}}";
+    }
+}
+
 internal sealed class StripePaymentCheckoutGateway(
     IOptions<StripeOptions> options) : IPaymentCheckoutGateway
 {
@@ -42,36 +89,18 @@ internal sealed class StripePaymentCheckoutGateway(
         var priceId = GetPriceId(product.Code);
         ValidateConfiguration(priceId);
 
-        var stripeClient = new StripeClient(_options.SecretKey);
-        var sessionService = new SessionService(stripeClient);
-        var session = await sessionService.CreateAsync(
-            new SessionCreateOptions
+        var session = await StripeCheckoutSession.CreateAsync(
+            _options.SecretKey,
+            priceId,
+            emailAddress.Value,
+            _options.SuccessUrl,
+            _options.CancelUrl,
+            new Dictionary<string, string>
             {
-                Mode = "payment",
-                CustomerEmail = emailAddress.Value,
-                SuccessUrl = AppendSessionPlaceholder(_options.SuccessUrl),
-                CancelUrl = _options.CancelUrl,
-                LineItems =
-                [
-                    new SessionLineItemOptions
-                    {
-                        Price = priceId,
-                        Quantity = 1
-                    }
-                ],
-                Metadata = new Dictionary<string, string>
-                {
-                    ["product_code"] = product.Code,
-                    ["purchaser_email"] = emailAddress.Value
-                }
+                ["product_code"] = product.Code,
+                ["purchaser_email"] = emailAddress.Value
             },
-            cancellationToken: cancellationToken);
-
-        if (string.IsNullOrWhiteSpace(session.Url))
-        {
-            throw new InvalidOperationException(
-                "Stripe created a Checkout Session without a redirect URL.");
-        }
+            cancellationToken);
 
         return new PaymentCheckoutSession(session.Id, session.Url);
     }
@@ -95,18 +124,12 @@ internal sealed class StripePaymentCheckoutGateway(
                 "Stripe Checkout is not configured yet. Add the Stripe secret, price IDs, and return URLs.");
         }
     }
-
-    private static string AppendSessionPlaceholder(string successUrl)
-    {
-        var separator = successUrl.Contains('?', StringComparison.Ordinal) ? "&" : "?";
-        return $"{successUrl}{separator}session_id={{CHECKOUT_SESSION_ID}}";
-    }
 }
 
 internal sealed class StripePaymentWebhookHandler(
     IOptions<StripeOptions> options,
     ICommercialRepository repository,
-    ICompanyRepository companyRepository) : IPaymentWebhookHandler
+    ICompanyBillingRepository companyBillingRepository) : IPaymentWebhookHandler
 {
     private readonly StripeOptions _options = options.Value;
 
@@ -121,11 +144,7 @@ internal sealed class StripePaymentWebhookHandler(
                 "Stripe webhook processing is not configured yet.");
         }
 
-        var stripeEvent = EventUtility.ConstructEvent(
-            payload,
-            signature,
-            _options.WebhookSecret,
-            throwOnApiVersionMismatch: false);
+        var stripeEvent = ConstructEvent(payload, signature);
         if (stripeEvent.Data.Object is not Session session)
         {
             return false;
@@ -139,7 +158,7 @@ internal sealed class StripePaymentWebhookHandler(
                 return false;
             }
 
-            return await companyRepository.ApplyCompanyPaymentAsync(
+            return await companyBillingRepository.ApplyCompanyPaymentAsync(
                 new CompanyPaymentEvent(
                     stripeEvent.Id,
                     session.Id,
@@ -167,6 +186,22 @@ internal sealed class StripePaymentWebhookHandler(
             session.Currency,
             new DateTimeOffset(stripeEvent.Created.ToUniversalTime()));
         return await repository.ApplyPaymentEventAsync(paymentEvent, cancellationToken);
+    }
+
+    private Event ConstructEvent(string payload, string signature)
+    {
+        try
+        {
+            return EventUtility.ConstructEvent(
+                payload,
+                signature,
+                _options.WebhookSecret,
+                throwOnApiVersionMismatch: false);
+        }
+        catch (StripeException exception)
+        {
+            throw new PaymentValidationException(exception.Message, exception);
+        }
     }
 
     private static PaymentStatus? GetStatus(
@@ -225,48 +260,25 @@ internal sealed class StripeCompanyBillingGateway(
                 "Company credit bundles are not configured.");
         }
 
-        var session = await new SessionService(new StripeClient(_options.SecretKey))
-            .CreateAsync(
-                new SessionCreateOptions
-                {
-                    Mode = "payment",
-                    CustomerEmail = email,
-                    SuccessUrl = AppendSessionPlaceholder(_options.CompanySuccessUrl),
-                    CancelUrl = _options.CompanyCancelUrl,
-                    LineItems =
-                    [
-                        new SessionLineItemOptions
-                        {
-                            Price = bundle.PriceId,
-                            Quantity = 1
-                        }
-                    ],
-                    Metadata = new Dictionary<string, string>
-                    {
-                        ["checkout_type"] = "company_credits",
-                        ["organization_id"] = organizationId.ToString(),
-                        ["bundle_code"] = bundleCode,
-                        ["credits"] = bundle.Credits.ToString()
-                    }
-                },
-                cancellationToken: cancellationToken);
-
-        if (string.IsNullOrWhiteSpace(session.Url))
-        {
-            throw new InvalidOperationException(
-                "Stripe created a Checkout Session without a redirect URL.");
-        }
+        var session = await StripeCheckoutSession.CreateAsync(
+            _options.SecretKey,
+            bundle.PriceId,
+            email,
+            _options.CompanySuccessUrl,
+            _options.CompanyCancelUrl,
+            new Dictionary<string, string>
+            {
+                ["checkout_type"] = "company_credits",
+                ["organization_id"] = organizationId.ToString(),
+                ["bundle_code"] = bundleCode,
+                ["credits"] = bundle.Credits.ToString()
+            },
+            cancellationToken);
 
         return new CompanyCheckoutSession(
             session.Id,
             session.Url,
             bundleCode,
             bundle.Credits);
-    }
-
-    private static string AppendSessionPlaceholder(string successUrl)
-    {
-        var separator = successUrl.Contains('?', StringComparison.Ordinal) ? "&" : "?";
-        return $"{successUrl}{separator}session_id={{CHECKOUT_SESSION_ID}}";
     }
 }

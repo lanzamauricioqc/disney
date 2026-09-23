@@ -92,7 +92,7 @@ internal static class CommercialEndpoints
                 cancellationToken);
             return Results.Ok(new { processed });
         }
-        catch (Stripe.StripeException exception)
+        catch (PaymentValidationException exception)
         {
             return Results.BadRequest(new { error = exception.Message });
         }

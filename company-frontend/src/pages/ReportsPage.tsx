@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Empty, ErrorState, Loading, PageHeader } from "../components/Ui";
 import { useI18n } from "../i18n";
+import { download } from "../lib/api";
+import { errorText } from "../lib/apiError";
 import { asList, text } from "../lib/format";
 import { useApiData } from "../lib/useApiData";
 
@@ -22,25 +24,17 @@ export function ReportsPage() {
   const totalCredits = months.reduce((sum, month) => sum + Number(month.creditsConsumed ?? 0), 0);
   const maximum = Math.max(1, ...months.map(month => Number(month.visitsCreated ?? 0)));
 
-  const download = async () => {
+  const downloadReport = async () => {
     setDownloadError("");
     try {
-      const token = sessionStorage.getItem("parkPilotCompanyToken") ?? "";
-      const response = await fetch("/api/v1/company/reports/usage.csv", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!response.ok) {
-        throw new Error(`${t("CSV download failed.")} (${response.status})`);
-      }
-
-      const url = URL.createObjectURL(await response.blob());
+      const url = URL.createObjectURL(await download("/reports/usage.csv", "text/csv"));
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = "park-pilot-usage.csv";
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      setDownloadError(error instanceof Error ? error.message : t("CSV download failed."));
+      setDownloadError(errorText(error, t));
     }
   };
 
@@ -49,7 +43,7 @@ export function ReportsPage() {
       eyebrow={t("USAGE INTELLIGENCE")}
       title={t("Reports")}
       description={t("Monthly organization visit and credit usage.")}
-      action={<button className="btn btn--secondary" onClick={() => void download()}>{t("Download CSV")}</button>}
+      action={<button className="btn btn--secondary" onClick={() => void downloadReport()}>{t("Download CSV")}</button>}
     />
     {downloadError && <div className="notice notice--error" role="alert">{downloadError}</div>}
     <section className="metric-grid report-metrics">

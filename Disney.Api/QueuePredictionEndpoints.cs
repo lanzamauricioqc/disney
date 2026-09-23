@@ -17,36 +17,18 @@ internal static class QueuePredictionEndpoints
                 DateTimeOffset at,
                 IQueuePredictionService predictionService,
                 CancellationToken cancellationToken) =>
-                await ExecutePredictionAsync(
+                await EndpointResults.ExecuteFoundAsync(
                     () => predictionService.PredictWaitTimeAsync(
                         parkId,
                         attractionId,
                         at,
-                        cancellationToken)))
+                        cancellationToken),
+                    "prediction"))
             .WithName("PredictAttractionWaitTime")
             .WithSummary("Predicts an attraction wait time later in the day")
             .WithTags("Queue prediction")
             .CacheOutput("analytics");
 
         return endpoints;
-    }
-
-    private static async Task<IResult> ExecutePredictionAsync(
-        Func<Task<WaitTimePredictionResult?>> execute)
-    {
-        try
-        {
-            var prediction = await execute();
-            return prediction is null
-                ? Results.NotFound()
-                : Results.Ok(prediction);
-        }
-        catch (ArgumentOutOfRangeException exception)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                [exception.ParamName ?? "prediction"] = [exception.Message]
-            });
-        }
     }
 }

@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Disney.Api;
 using Disney.Application;
+using Disney.Domain;
 using Disney.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -30,34 +31,11 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 120,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
+        FixedWindowPartition(ClientPartitionKey(context), 120));
     options.AddPolicy("company-auth", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 10,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
+        FixedWindowPartition(ClientPartitionKey(context), 10));
     options.AddPolicy("company-integration", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.Request.Headers["X-Api-Key"].ToString() is { Length: > 0 } key
-                ? key[..Math.Min(key.Length, 12)]
-                : context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 60,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
+        FixedWindowPartition(ApiKeyPartitionKey(context), 60));
 });
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -113,11 +91,11 @@ builder.Services.AddAuthorizationBuilder()
         policy.RequireClaim("role");
     })
     .AddPolicy("CompanyTeamManagement", policy =>
-        policy.RequireRole("Owner", "Administrator"))
+        policy.RequireRole(RoleNamesAllowedBy(CompanyRoleRules.CanManageTeam)))
     .AddPolicy("CompanyBillingManagement", policy =>
-        policy.RequireRole("Owner", "Administrator"))
+        policy.RequireRole(RoleNamesAllowedBy(CompanyRoleRules.CanManageBilling)))
     .AddPolicy("CompanyConfigurationManagement", policy =>
-        policy.RequireRole("Owner", "Administrator"));
+        policy.RequireRole(RoleNamesAllowedBy(CompanyRoleRules.CanManageConfiguration)));
 builder.Services.AddSingleton<ICompanyTokenService, CompanyJwtTokenService>();
 builder.Services.AddScoped<CompanyService>();
 builder.Services.AddScoped<IQueueAnalyticsService, QueueAnalyticsService>();
@@ -184,5 +162,31 @@ application.MapCompanyEndpoints();
 
 await application.Services.GetRequiredService<IDatabaseMigrator>().MigrateAsync();
 application.Run();
+
+static string ClientPartitionKey(HttpContext context) =>
+    context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+static string ApiKeyPartitionKey(HttpContext context) =>
+    context.Request.Headers["X-Api-Key"].ToString() is { Length: > 0 } apiKey
+        ? CompanyApiKeyRules.GetPrefix(apiKey)
+        : ClientPartitionKey(context);
+
+static RateLimitPartition<string> FixedWindowPartition(
+    string partitionKey,
+    int permitLimit) =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey,
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+
+static string[] RoleNamesAllowedBy(Func<CompanyRole, bool> isAllowed) =>
+    Enum.GetValues<CompanyRole>()
+        .Where(isAllowed)
+        .Select(role => role.ToString())
+        .ToArray();
 
 public partial class Program;

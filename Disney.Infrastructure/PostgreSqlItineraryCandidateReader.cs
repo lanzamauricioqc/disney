@@ -44,7 +44,7 @@ internal sealed class PostgreSqlItineraryCandidateReader(
                 ) latest_observation ON TRUE
                 LEFT JOIN LATERAL (
                     SELECT CASE
-                               WHEN COUNT(*) >= 3
+                               WHEN COUNT(*) >= @MinimumHistoricalSampleCount
                                THEN percentile_cont(0.5) WITHIN GROUP (
                                    ORDER BY observation.wait_minutes
                                )::smallint
@@ -84,7 +84,8 @@ internal sealed class PostgreSqlItineraryCandidateReader(
                     LiveObservationTo = liveObservationTo,
                     HistoricalTargetAt = historicalTargetAt,
                     HistoricalWindowStart = historicalWindowStart,
-                    HistoricalWindowEnd = historicalWindowEnd
+                    HistoricalWindowEnd = historicalWindowEnd,
+                    MinimumHistoricalSampleCount = QueueHistoryWindow.MinimumSampleCount
                 },
                 cancellationToken: cancellationToken));
         return candidates.AsList();

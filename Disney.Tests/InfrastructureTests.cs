@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Disney.Application;
 using Disney.Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -267,7 +268,11 @@ public sealed class InfrastructureTests
 
         Assert.Contains("latest_observation.wait_minutes AS WaitMinutes", readerSourceCode);
         Assert.Contains("HistoricalWaitMinutes", readerSourceCode);
-        Assert.Contains("COUNT(*) >= 3", readerSourceCode);
+        Assert.Contains("COUNT(*) >= @MinimumHistoricalSampleCount", readerSourceCode);
+        Assert.Contains(
+            "MinimumHistoricalSampleCount = QueueHistoryWindow.MinimumSampleCount",
+            readerSourceCode);
+        Assert.Equal(3, QueueHistoryWindow.MinimumSampleCount);
         Assert.Contains("percentile_cont(0.5)", readerSourceCode);
         Assert.Contains("@HistoricalTargetAt AT TIME ZONE park.timezone", readerSourceCode);
         Assert.Contains("observation.observed_day_of_week", readerSourceCode);

@@ -61,3 +61,11 @@ public static class CompanyColorRules
         color[0] == '#' &&
         color.Skip(1).All(Uri.IsHexDigit);
 }
+
+public static class CompanyApiKeyRules
+{
+    public const int PrefixLength = 12;
+
+    public static string GetPrefix(string secret) =>
+        secret[..Math.Min(secret.Length, PrefixLength)];
+}

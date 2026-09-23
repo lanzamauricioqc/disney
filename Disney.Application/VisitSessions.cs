@@ -26,7 +26,24 @@ public sealed record VisitSessionStop(
     int AttractionDurationMinutes,
     DateTimeOffset CompletesAt,
     VisitSessionStopStatus Status,
-    DateTimeOffset? StatusChangedAt);
+    DateTimeOffset? StatusChangedAt)
+{
+    public static VisitSessionStop CreatePending(ItineraryStop stop, int sequence) =>
+        new(
+            sequence,
+            stop.AttractionId,
+            stop.AttractionName,
+            stop.Preference,
+            stop.TravelStartsAt,
+            stop.WalkingMinutes,
+            stop.QueueStartsAt,
+            stop.QueueMinutes,
+            stop.AttractionStartsAt,
+            stop.AttractionDurationMinutes,
+            stop.CompletesAt,
+            VisitSessionStopStatus.Pending,
+            null);
+}
 
 public sealed record VisitSession(
     Guid Id,

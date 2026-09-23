@@ -40,7 +40,7 @@ public interface ICompanyBillingGateway
         CancellationToken cancellationToken);
 }
 
-public interface ICompanyRepository
+public interface ICompanyAuthenticationRepository
 {
     Task<CompanyUser?> BootstrapAsync(
         string organizationName,
@@ -53,22 +53,15 @@ public interface ICompanyRepository
         string normalizedEmail,
         CancellationToken cancellationToken);
 
-    Task<CompanyInvitation?> CreateInvitationAsync(
-        CompanyActor actor,
-        Guid invitationId,
-        string normalizedEmail,
-        CompanyRole role,
-        string tokenHash,
-        DateTimeOffset expiresAt,
-        DateTimeOffset createdAt,
-        CancellationToken cancellationToken);
-
     Task<CompanyUser?> AcceptInvitationAsync(
         string tokenHash,
         string passwordHash,
         DateTimeOffset acceptedAt,
         CancellationToken cancellationToken);
+}
 
+public interface ICompanyOrganizationRepository
+{
     Task<OrganizationDetails?> GetOrganizationAsync(
         Guid organizationId,
         CancellationToken cancellationToken);
@@ -83,6 +76,19 @@ public interface ICompanyRepository
         CompanyActor actor,
         BrandingUpdate update,
         DateTimeOffset updatedAt,
+        CancellationToken cancellationToken);
+}
+
+public interface ICompanyTeamRepository
+{
+    Task<CompanyInvitation?> CreateInvitationAsync(
+        CompanyActor actor,
+        Guid invitationId,
+        string normalizedEmail,
+        CompanyRole role,
+        string tokenHash,
+        DateTimeOffset expiresAt,
+        DateTimeOffset createdAt,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<CompanyUser>> ListTeamAsync(
@@ -105,7 +111,10 @@ public interface ICompanyRepository
         Guid userId,
         DateTimeOffset deactivatedAt,
         CancellationToken cancellationToken);
+}
 
+public interface ICompanyCustomerRepository
+{
     Task<IReadOnlyList<CompanyCustomer>> SearchCustomersAsync(
         Guid organizationId,
         string? search,
@@ -136,7 +145,10 @@ public interface ICompanyRepository
         Guid customerId,
         DateTimeOffset deletedAt,
         CancellationToken cancellationToken);
+}
 
+public interface ICompanyVisitRepository
+{
     Task<IReadOnlyList<CompanyVisit>> ListVisitsAsync(
         Guid organizationId,
         DateOnly? from,
@@ -236,7 +248,10 @@ public interface ICompanyRepository
         string tokenHash,
         DateTimeOffset accessedAt,
         CancellationToken cancellationToken);
+}
 
+public interface ICompanyBillingRepository
+{
     Task<CreditBalance> GetCreditBalanceAsync(
         Guid organizationId,
         CancellationToken cancellationToken);
@@ -262,7 +277,10 @@ public interface ICompanyRepository
     Task<bool> ApplyCompanyPaymentAsync(
         CompanyPaymentEvent paymentEvent,
         CancellationToken cancellationToken);
+}
 
+public interface ICompanyReportingRepository
+{
     Task<CompanyDashboard> GetDashboardAsync(
         Guid organizationId,
         DateOnly today,
@@ -273,7 +291,10 @@ public interface ICompanyRepository
         DateOnly fromMonth,
         DateOnly toMonth,
         CancellationToken cancellationToken);
+}
 
+public interface ICompanyIntegrationRepository
+{
     Task<CompanyApiKey> CreateApiKeyAsync(
         CompanyActor actor,
         Guid apiKeyId,
@@ -309,3 +330,17 @@ public interface ICompanyRepository
         int limit,
         CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// Composite contract kept for the single PostgreSQL implementation. Consumers
+/// should depend on the narrowest interface that covers their use.
+/// </summary>
+public interface ICompanyRepository :
+    ICompanyAuthenticationRepository,
+    ICompanyOrganizationRepository,
+    ICompanyTeamRepository,
+    ICompanyCustomerRepository,
+    ICompanyVisitRepository,
+    ICompanyBillingRepository,
+    ICompanyReportingRepository,
+    ICompanyIntegrationRepository;

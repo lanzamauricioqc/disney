@@ -4,8 +4,7 @@ public sealed class QueuePredictionService(
     IQueuePredictionReader reader,
     TimeProvider timeProvider) : IQueuePredictionService
 {
-    private const int LookbackMonths = 3;
-    private const int MinimumHistoricalSamples = 3;
+    private const int MinimumHistoricalSamples = QueueHistoryWindow.MinimumSampleCount;
     private const int FullSampleConfidenceCount = 12;
     private const string AlgorithmVersion = "weekday-quarter-hour-median-v1";
     public static readonly TimeSpan MaximumPredictionHorizon = TimeSpan.FromDays(1);
@@ -23,7 +22,7 @@ public sealed class QueuePredictionService(
             parkId,
             attractionId,
             targetAt,
-            generatedAt.AddMonths(-LookbackMonths),
+            generatedAt.AddMonths(-QueueHistoryWindow.LookbackMonths),
             generatedAt,
             cancellationToken);
 
@@ -113,19 +112,8 @@ public sealed class QueuePredictionService(
         DateTimeOffset targetAt,
         DateTimeOffset generatedAt)
     {
-        if (parkId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(parkId),
-                "Park id must be greater than zero.");
-        }
-
-        if (attractionId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(attractionId),
-                "Attraction id must be greater than zero.");
-        }
+        RequestGuard.RequireParkIdentifier(parkId);
+        RequestGuard.RequireAttractionIdentifier(attractionId);
 
         if (targetAt <= generatedAt)
         {

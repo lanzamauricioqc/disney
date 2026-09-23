@@ -6,7 +6,6 @@ public sealed class ItineraryOptimizationService(
     TimeProvider timeProvider) : IItineraryOptimizationService
 {
     private const int DefaultAttractionDurationMinutes = 10;
-    private const int HistoricalLookbackMonths = 3;
     private const string AlgorithmVersion = "priority-live-history-walking-greedy-v3";
     public static readonly TimeSpan MaximumVisitWindow = TimeSpan.FromDays(1);
 
@@ -25,7 +24,7 @@ public sealed class ItineraryOptimizationService(
             generatedAt.Subtract(QueueDataFreshness.MaximumLiveObservationAge),
             generatedAt,
             command.VisitStartAt,
-            generatedAt.AddMonths(-HistoricalLookbackMonths),
+            generatedAt.AddMonths(-QueueHistoryWindow.LookbackMonths),
             generatedAt,
             cancellationToken);
         var candidatesById = candidates.ToDictionary(candidate => candidate.AttractionId);
@@ -251,12 +250,7 @@ public sealed class ItineraryOptimizationService(
 
     private static void Validate(long parkId, GenerateItineraryCommand command)
     {
-        if (parkId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(parkId),
-                "Park id must be greater than zero.");
-        }
+        RequestGuard.RequireParkIdentifier(parkId);
 
         if (command.VisitEndAt <= command.VisitStartAt)
         {
@@ -276,7 +270,7 @@ public sealed class ItineraryOptimizationService(
         {
             throw new ArgumentOutOfRangeException(
                 nameof(command.StartingAttractionId),
-                "Starting attraction id must be greater than zero.");
+                "Starting attraction ID must be greater than zero.");
         }
 
         if (command.Preferences.Count == 0)
@@ -290,7 +284,7 @@ public sealed class ItineraryOptimizationService(
         {
             throw new ArgumentOutOfRangeException(
                 nameof(command.Preferences),
-                "Attraction ids must be greater than zero.");
+                "Attraction IDs must be greater than zero.");
         }
 
         if (command.Preferences.Any(preference => !Enum.IsDefined(preference.Level)))

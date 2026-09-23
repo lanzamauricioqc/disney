@@ -22,11 +22,18 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IItineraryCandidateReader, PostgreSqlItineraryCandidateReader>();
         services.AddScoped<IVisitSessionStore, PostgreSqlVisitSessionStore>();
         services.AddScoped<IAdminRepository, PostgreSqlAdminRepository>();
-        services.AddScoped<IWaitlistRepository, PostgreSqlCommercialRepository>();
-        services.AddScoped<ICommercialRepository, PostgreSqlCommercialRepository>();
+        services.AddScoped<PostgreSqlCommercialRepository>();
+        services.AddScoped<IWaitlistRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<PostgreSqlCommercialRepository>());
+        services.AddScoped<ICommercialRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<PostgreSqlCommercialRepository>());
         services.AddScoped<IPaymentCheckoutGateway, StripePaymentCheckoutGateway>();
         services.AddScoped<IPaymentWebhookHandler, StripePaymentWebhookHandler>();
-        services.AddScoped<ICompanyRepository, PostgreSqlCompanyRepository>();
+        services.AddScoped<PostgreSqlCompanyRepository>();
+        services.AddScoped<ICompanyRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<PostgreSqlCompanyRepository>());
+        services.AddScoped<ICompanyBillingRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<PostgreSqlCompanyRepository>());
         services.AddSingleton<ICompanyPasswordService, CompanyPasswordService>();
         services.AddSingleton<ICompanySecretService, CompanySecretService>();
         services.AddScoped<ICompanyNotificationOutbox, PostgreSqlCompanyNotificationOutbox>();

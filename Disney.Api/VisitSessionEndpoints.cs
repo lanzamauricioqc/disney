@@ -116,24 +116,8 @@ internal static class VisitSessionEndpoints
             .WithTags("Visit sessions");
     }
 
-    private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> execute)
-    {
-        try
-        {
-            return await execute();
-        }
-        catch (ArgumentException exception)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                [exception.ParamName ?? "visitSession"] = [exception.Message]
-            });
-        }
-        catch (InvalidOperationException exception)
-        {
-            return Results.Conflict(new { detail = exception.Message });
-        }
-    }
+    private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> execute) =>
+        await EndpointResults.ExecuteWithConflictAsync(execute, "visitSession");
 
     internal sealed record StartVisitSessionRequest(
         int PartySize,

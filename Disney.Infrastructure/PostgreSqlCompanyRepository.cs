@@ -49,12 +49,6 @@ internal sealed partial class PostgreSqlCompanyRepository(
             VALUES
                 (@UserId, @OrganizationId, @Email, @PasswordHash, 'owner', true,
                  @CreatedAt, @CreatedAt);
-
-            INSERT INTO public.company_audit_logs
-                (organization_id, actor_user_id, action, entity_type, entity_id, created_at)
-            VALUES
-                (@OrganizationId, @UserId, 'organization.bootstrapped',
-                 'organization', @OrganizationId::text, @CreatedAt);
             """,
             new
             {
@@ -67,6 +61,17 @@ internal sealed partial class PostgreSqlCompanyRepository(
             },
             transaction,
             cancellationToken: cancellationToken));
+        await WriteAuditAsync(
+            connection,
+            transaction,
+            organizationId,
+            userId,
+            "organization.bootstrapped",
+            "organization",
+            organizationId.ToString(),
+            null,
+            createdAt,
+            cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new CompanyUser(
             userId,
@@ -595,6 +600,29 @@ internal sealed partial class PostgreSqlCompanyRepository(
         object details,
         DateTimeOffset createdAt,
         CancellationToken cancellationToken) =>
+        WriteAuditAsync(
+            connection,
+            transaction,
+            actor.OrganizationId,
+            actor.UserId,
+            action,
+            entityType,
+            entityId,
+            details,
+            createdAt,
+            cancellationToken);
+
+    private static Task WriteAuditAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        Guid organizationId,
+        Guid? actorUserId,
+        string action,
+        string entityType,
+        string? entityId,
+        object? details,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken) =>
         connection.ExecuteAsync(new CommandDefinition(
             """
             INSERT INTO public.company_audit_logs
@@ -606,12 +634,12 @@ internal sealed partial class PostgreSqlCompanyRepository(
             """,
             new
             {
-                actor.OrganizationId,
-                ActorUserId = actor.UserId,
+                OrganizationId = organizationId,
+                ActorUserId = actorUserId,
                 Action = action,
                 EntityType = entityType,
                 EntityId = entityId,
-                DetailsJson = JsonSerializer.Serialize(details),
+                DetailsJson = details is null ? null : JsonSerializer.Serialize(details),
                 CreatedAt = createdAt
             },
             transaction,

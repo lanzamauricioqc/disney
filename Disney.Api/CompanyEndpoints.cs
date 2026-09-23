@@ -705,9 +705,10 @@ internal static class CompanyEndpoints
         DateOnly? toMonth,
         ClaimsPrincipal principal,
         CompanyService service,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var (from, to, error) = UsageRange(fromMonth, toMonth);
+        var (from, to, error) = UsageRange(fromMonth, toMonth, timeProvider);
         return error is not null
             ? Results.ValidationProblem(error)
             : Results.Ok(await service.GetMonthlyUsageAsync(
@@ -722,9 +723,10 @@ internal static class CompanyEndpoints
         DateOnly? toMonth,
         ClaimsPrincipal principal,
         CompanyService service,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var (from, to, error) = UsageRange(fromMonth, toMonth);
+        var (from, to, error) = UsageRange(fromMonth, toMonth, timeProvider);
         if (error is not null)
         {
             return Results.ValidationProblem(error);
@@ -1031,9 +1033,10 @@ internal static class CompanyEndpoints
         DateOnly To,
         Dictionary<string, string[]>? Error) UsageRange(
         DateOnly? fromMonth,
-        DateOnly? toMonth)
+        DateOnly? toMonth,
+        TimeProvider timeProvider)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
         var to = toMonth ?? new DateOnly(today.Year, today.Month, 1);
         var from = fromMonth ?? to.AddMonths(-11);
         if (from > to || to.Year * 12 + to.Month - (from.Year * 12 + from.Month) > 35)

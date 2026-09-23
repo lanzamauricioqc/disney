@@ -4,7 +4,6 @@ public sealed class QueueAnalyticsService(
     IQueueAnalyticsReader reader,
     TimeProvider timeProvider) : IQueueAnalyticsService
 {
-    private const int LookbackMonths = 3;
     private const int DaysInWeek = 7;
     private static readonly TimeZoneInfo ParkTimeZone =
         TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
@@ -14,7 +13,7 @@ public sealed class QueueAnalyticsService(
         long parkId,
         CancellationToken cancellationToken)
     {
-        ValidateParkId(parkId);
+        RequestGuard.RequireParkIdentifier(parkId);
         var windowEnd = timeProvider.GetUtcNow();
         var windowStart = windowEnd.Subtract(
             QueueDataFreshness.MaximumLiveObservationAge);
@@ -72,7 +71,7 @@ public sealed class QueueAnalyticsService(
             TimeZoneInfo.ConvertTime(generatedAt, ParkTimeZone).DateTime);
         var currentWeekStart = StartOfWeek(currentDate);
         var selectedWeekStart = weekStart ?? currentWeekStart;
-        var availableFrom = currentDate.AddMonths(-LookbackMonths);
+        var availableFrom = currentDate.AddMonths(-QueueHistoryWindow.LookbackMonths);
 
         ValidateWeek(selectedWeekStart, availableFrom, currentWeekStart);
 
@@ -136,28 +135,13 @@ public sealed class QueueAnalyticsService(
     private (DateTimeOffset From, DateTimeOffset To) CreateWindow()
     {
         var windowEnd = timeProvider.GetUtcNow();
-        return (windowEnd.AddMonths(-LookbackMonths), windowEnd);
+        return (windowEnd.AddMonths(-QueueHistoryWindow.LookbackMonths), windowEnd);
     }
 
     private static void Validate(long parkId, long? attractionId)
     {
-        ValidateParkId(parkId);
-        if (attractionId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(attractionId),
-                "Attraction id must be greater than zero.");
-        }
-    }
-
-    private static void ValidateParkId(long parkId)
-    {
-        if (parkId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(parkId),
-                "Park id must be greater than zero.");
-        }
+        RequestGuard.RequireParkIdentifier(parkId);
+        RequestGuard.RequireOptionalAttractionIdentifier(attractionId);
     }
 
     private static void ValidateHistoricalWindow(

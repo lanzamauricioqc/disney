@@ -26,7 +26,7 @@ builder.Services.AddScoped<IQueueCollectionService, QueueCollectionService>();
 builder.Services.AddScoped<IQueueCollectionJob, QueueCollectionJob>();
 builder.Services
     .AddOptions<QueueCollectionOptions>()
-    .Bind(builder.Configuration.GetSection("QueueCollection"))
+    .Bind(builder.Configuration.GetSection(QueueCollectionOptions.SectionName))
     .Validate(
         options => options.Interval > TimeSpan.Zero,
         "QueueCollection:Interval must be greater than zero.")

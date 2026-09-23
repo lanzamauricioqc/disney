@@ -15,35 +15,17 @@ internal static class WalkingTimeEndpoints
                     long toAttractionId,
                     IWalkingTimeService walkingTimeService,
                     CancellationToken cancellationToken) =>
-                    await ExecuteAsync(
+                    await EndpointResults.ExecuteFoundAsync(
                         () => walkingTimeService.EstimateAsync(
                             parkId,
                             fromAttractionId,
                             toAttractionId,
-                            cancellationToken)))
+                            cancellationToken),
+                        "walkingTime"))
             .WithName("EstimateWalkingTime")
             .WithSummary("Estimates walking time between two attractions")
             .WithTags("Park routing");
 
         return endpoints;
-    }
-
-    private static async Task<IResult> ExecuteAsync(
-        Func<Task<WalkingTimeEstimateResult?>> execute)
-    {
-        try
-        {
-            var estimate = await execute();
-            return estimate is null
-                ? Results.NotFound()
-                : Results.Ok(estimate);
-        }
-        catch (ArgumentOutOfRangeException exception)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                [exception.ParamName ?? "walkingTime"] = [exception.Message]
-            });
-        }
     }
 }

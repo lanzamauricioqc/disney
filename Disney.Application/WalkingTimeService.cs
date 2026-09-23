@@ -176,25 +176,14 @@ public sealed class WalkingTimeService(IWalkingTimeReader reader) : IWalkingTime
         long fromAttractionId,
         long toAttractionId)
     {
-        if (parkId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(parkId),
-                "Park id must be greater than zero.");
-        }
-
-        if (fromAttractionId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(fromAttractionId),
-                "Origin attraction id must be greater than zero.");
-        }
-
-        if (toAttractionId <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(toAttractionId),
-                "Destination attraction id must be greater than zero.");
-        }
+        RequestGuard.RequireParkIdentifier(parkId);
+        RequestGuard.RequirePositiveIdentifier(
+            fromAttractionId,
+            nameof(fromAttractionId),
+            "Origin attraction ID");
+        RequestGuard.RequirePositiveIdentifier(
+            toAttractionId,
+            nameof(toAttractionId),
+            "Destination attraction ID");
     }
 }
